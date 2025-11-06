@@ -1063,7 +1063,7 @@ bool os::same_files(const char* file1, const char* file2) {
 // Called when creating the thread.  The minimum stack sizes have already been calculated
 size_t os::Posix::get_initial_stack_size(ThreadType thr_type, size_t req_stack_size) {
   size_t stack_size;
-  if (req_stack_size == 0) {
+  if (req_stack_size == 0) { // 如果没有设置 java的线程栈大小，则设置默认大小
     stack_size = default_stack_size(thr_type);
   } else {
     stack_size = req_stack_size;
@@ -1078,7 +1078,7 @@ size_t os::Posix::get_initial_stack_size(ThreadType thr_type, size_t req_stack_s
       stack_size = JavaThread::stack_size_at_create();
     }
     stack_size = MAX2(stack_size,
-                      _java_thread_min_stack_allowed);
+                      _java_thread_min_stack_allowed); // _java_thread_min_stack_allowed 最小允许160K
     break;
   case os::compiler_thread:
     if (req_stack_size == 0 && CompilerThreadStackSize > 0) {

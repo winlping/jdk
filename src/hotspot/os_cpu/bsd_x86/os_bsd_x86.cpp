@@ -687,7 +687,7 @@ size_t os::_vm_internal_thread_min_stack_allowed = (48 DEBUG_ONLY(+ 4)) * K;
 size_t os::Posix::default_stack_size(os::ThreadType thr_type) {
   // default stack size (compiler thread needs larger stack)
 #ifdef AMD64
-  size_t s = (thr_type == os::compiler_thread ? 4 * M : 1 * M);
+  size_t s = (thr_type == os::compiler_thread ? 4 * M : 1 * M); // 如果是编译线程设置 4M，其他线程默认设置 1M
 #else
   size_t s = (thr_type == os::compiler_thread ? 2 * M : 512 * K);
 #endif // AMD64

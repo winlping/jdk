@@ -845,7 +845,7 @@ int os::random() {
 
 void os::start_thread(Thread* thread) {
   OSThread* osthread = thread->osthread();
-  osthread->set_state(RUNNABLE);
+  osthread->set_state(RUNNABLE); // 设置 OSThread 状态为Runnable ,使前面循环等待解锁
   pd_start_thread(thread);
 }
 

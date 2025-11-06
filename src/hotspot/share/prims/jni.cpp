@@ -880,7 +880,7 @@ static void jni_invoke_static(JNIEnv *env, JavaValue* result, jobject receiver, 
   result->set_type(args->return_type());
 
   // Invoke the method. Result is returned as oop.
-  JavaCalls::call(result, method, &java_args, CHECK);
+  JavaCalls::call(result, method, &java_args, CHECK); // 调用静态方法，启动的时候调用main方法
 
   // Convert result
   if (is_reference_type(result->get_type())) {
@@ -3559,8 +3559,8 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
   // We use Atomic::xchg rather than Atomic::add/dec since on some platforms
   // the add/dec implementations are dependent on whether we are running
   // on a multiprocessor Atomic::xchg does not have this problem.
-  if (Atomic::xchg(&vm_created, IN_PROGRESS) != NOT_CREATED) {
-    return JNI_EEXIST;   // already created, or create attempt in progress
+  if (Atomic::xchg(&vm_created, IN_PROGRESS) != NOT_CREATED) { // 将创建虚拟机的状态由  NOT_CREATED ——> IN_PROGRESS
+    return JNI_EEXIST;   // already created, or create attempt in progress 已经创建了就退出
   }
 
   // If a previous creation attempt failed but can be retried safely,
@@ -3568,7 +3568,7 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
   // cleared here. If a previous creation attempt succeeded and we then
   // destroyed that VM, we will be prevented from trying to recreate
   // the VM in the same process, as the value will still be 0.
-  if (Atomic::xchg(&safe_to_recreate_vm, 0) == 0) {
+  if (Atomic::xchg(&safe_to_recreate_vm, 0) == 0) { // 前面创建 vm 时出错后，尝试再次创建时 safe_to_recreate_vm 会在失败后清理后被设置成1 ，如果之前的vm 创建成功了，并且即将要销毁 vm 时，这里可以阻止再次创建 vm
     return JNI_ERR;
   }
 
@@ -3579,12 +3579,12 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
    * point during initialization if an error occurs we cannot allow
    * this function to be called again (or it will crash).  In those
    * situations, the 'canTryAgain' flag is set to false, which atomically
-   * sets safe_to_recreate_vm to 1, such that any new call to
+   * sets safe_to_recreate_vm to 1, such that any new call toJNI_CreateJavaVM
    * JNI_CreateJavaVM will immediately fail using the above logic.
    */
   bool can_try_again = true;
 
-  result = Threads::create_vm((JavaVMInitArgs*) args, &can_try_again);
+  result = Threads::create_vm((JavaVMInitArgs*) args, &can_try_again); // 创建虚拟机
   if (result == JNI_OK) {
     JavaThread *thread = JavaThread::current();
     assert(!thread->has_pending_exception(), "should have returned not OK");
@@ -3592,7 +3592,7 @@ static jint JNI_CreateJavaVM_inner(JavaVM **vm, void **penv, void *args) {
     *vm = (JavaVM *)(&main_vm);
     *(JNIEnv**)penv = thread->jni_environment();
     // mark creation complete for other JNI ops
-    Atomic::release_store(&vm_created, COMPLETE);
+    Atomic::release_store(&vm_created, COMPLETE); // 更新虚拟机创建完成状态
 
 #if INCLUDE_JVMCI
     if (EnableJVMCI) {
@@ -3736,7 +3736,7 @@ static jint JNICALL jni_DestroyJavaVM_inner(JavaVM *vm) {
   MACOS_AARCH64_ONLY(WXMode oldmode = thread->enable_wx(WXWrite));
 
   ThreadStateTransition::transition_from_native(thread, _thread_in_vm);
-  Threads::destroy_vm();
+  Threads::destroy_vm(); // 执行销毁虚拟机， 需要等待所有用户线程执行结束之后才销毁，只是在main方法结束后才执行
   // Don't bother restoring thread state, VM is gone.
   vm_created = NOT_CREATED;
   return JNI_OK;
@@ -3748,7 +3748,7 @@ jint JNICALL jni_DestroyJavaVM(JavaVM *vm) {
 #if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
   __try {
 #endif
-    result = jni_DestroyJavaVM_inner(vm);
+    result = jni_DestroyJavaVM_inner(vm);// 销毁虚拟机，在 main 方法结束后会等待所有的用户线程结束后执行后面的销毁工作
 #if defined(_WIN32) && !defined(USE_VECTORED_EXCEPTION_HANDLING)
   } __except(topLevelExceptionFilter((_EXCEPTION_POINTERS*)_exception_info())) {
     // Nothing to do.

@@ -50,7 +50,7 @@ WinMain(HINSTANCE inst, HINSTANCE previnst, LPSTR cmdline, int cmdshow)
 
 #else /* JAVAW */
 JNIEXPORT int
-main(int argc, char **argv)
+main(int argc, char **argv) // main 的入口
 {
     const jboolean const_javaw = JNI_FALSE;
 #endif /* JAVAW */

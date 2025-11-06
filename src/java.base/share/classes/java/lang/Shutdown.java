@@ -195,7 +195,7 @@ class Shutdown {
      * thread has finished.  Unlike the exit method, this method does not
      * actually halt the VM.
      */
-    static void shutdown() {
+    static void shutdown() { // 虚拟机回调
         synchronized (Shutdown.class) {
             runHooks();
         }

@@ -676,18 +676,18 @@ public class Thread implements Runnable {
     /**
      * Initializes a platform Thread.
      *
-     * @param g the Thread group, can be null
-     * @param name the name of the new Thread
+     * @param g the Thread group, can be null 线程组
+     * @param name the name of the new Thread 线程名称
      * @param characteristics thread characteristics
-     * @param task the object whose run() method gets called
-     * @param stackSize the desired stack size for the new thread, or
+     * @param task the object whose run() method gets called 线程执行的任务
+     * @param stackSize the desired stack size for the new thread, or 设置线程的栈深度
      *        zero to indicate that this parameter is to be ignored.
      */
     Thread(ThreadGroup g, String name, int characteristics, Runnable task, long stackSize) {
 
-        Thread parent = currentThread();
+        Thread parent = currentThread();// 获取父线程
         boolean attached = (parent == this);   // primordial or JNI attached
-
+        // 使用 holder 来存储线程组任务，栈深度等信息
         if (attached) {
             if (g == null) {
                 throw new InternalError("group cannot be null when attaching");
@@ -696,10 +696,10 @@ public class Thread implements Runnable {
         } else {
             if (g == null) {
                 // default to current thread's group
-                g = parent.getThreadGroup();
+                g = parent.getThreadGroup();// 如果没有设置线程组，将使用父线程的线程组
             }
-            int priority = Math.min(parent.getPriority(), g.getMaxPriority());
-            this.holder = new FieldHolder(g, task, stackSize, priority, parent.isDaemon());
+            int priority = Math.min(parent.getPriority(), g.getMaxPriority()); // 默认的优先级取父付线程或者线程组中最大优先级的最小值
+            this.holder = new FieldHolder(g, task, stackSize, priority, parent.isDaemon()); // 未手动设置守护线程标记前，使用父线程的守护线程标记
         }
 
         if (attached && VM.initLevel() < 1) {
@@ -708,7 +708,7 @@ public class Thread implements Runnable {
             this.tid = ThreadIdentifiers.next();
         }
 
-        this.name = (name != null) ? name : genThreadName();
+        this.name = (name != null) ? name : genThreadName(); // 如果线程名称为空，将会设置Thread-序号的线程名称
 
         // thread locals
         if (!attached) {
@@ -1504,7 +1504,7 @@ public class Thread implements Runnable {
      * This method is called by the VM to give a Thread
      * a chance to clean up before it actually exits.
      */
-    private void exit() {
+    private void exit() { // 虚拟机回调
         try {
             // pop any remaining scopes from the stack, this may block
             if (headStackableScopes != null) {
@@ -1701,15 +1701,15 @@ public class Thread implements Runnable {
      * @see ThreadGroup#getMaxPriority()
      */
     public final void setPriority(int newPriority) {
-        if (newPriority > MAX_PRIORITY || newPriority < MIN_PRIORITY) {
+        if (newPriority > MAX_PRIORITY || newPriority < MIN_PRIORITY) { // 设置的优先级只能在 [1 ～ 10] 的闭区间
             throw new IllegalArgumentException();
         }
-        if (!isVirtual()) {
+        if (!isVirtual()) {// 虚拟线程不能设置优先级
             priority(newPriority);
         }
     }
 
-    void priority(int newPriority) {
+    void priority(int newPriority) { // 设置的优先级不能超过线程组的最大优先级，超过后以 group的优先级为准
         ThreadGroup g = holder.group;
         if (g != null) {
             int maxPriority = g.getMaxPriority();
@@ -2522,8 +2522,8 @@ public class Thread implements Runnable {
             // uncaughtExceptionHandler may be set to null after thread terminates
             return null;
         } else {
-            UncaughtExceptionHandler ueh = uncaughtExceptionHandler;
-            return (ueh != null) ? ueh : getThreadGroup();
+            UncaughtExceptionHandler ueh = uncaughtExceptionHandler;// 获取未捕获异常处理器
+            return (ueh != null) ? ueh : getThreadGroup();// 如果未设置，则从线程组中获取
         }
     }
 
@@ -2619,5 +2619,5 @@ public class Thread implements Runnable {
     private native void setNativeName(String name);
 
     // The address of the next thread identifier, see ThreadIdentifiers.
-    private static native long getNextThreadIdOffset();
+    private static native long getNextThreadIdOffset(); // jvm层面设置优先级
 }

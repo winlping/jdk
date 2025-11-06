@@ -37,8 +37,8 @@ import java.util.concurrent.RejectedExecutionException;
 
 class ApplicationShutdownHooks {
     /* The set of registered hooks */
-    private static IdentityHashMap<Thread, Thread> hooks;
-    static {
+    private static IdentityHashMap<Thread, Thread> hooks; // 随 Runtime 类型调用addShutdown方法后被加载
+    static {// 加载后执行该静态代码块，向Shutdown类中添加一个钩子，该钩子包含了 ApplicationShutdownHooks 中的 hooks 中的钩子线程
         try {
             Shutdown.add(1 /* shutdown hook invocation order */,
                 false /* not registered if shutdown in progress */,
@@ -48,8 +48,8 @@ class ApplicationShutdownHooks {
                     }
                 }
             );
-            hooks = new IdentityHashMap<>();
-        } catch (IllegalStateException e) {
+            hooks = new IdentityHashMap<>();// 该结构用于存储 Runtime.addShutdownHook中的线程，在执行钩子函数时，会回调 Shutdown 类型中的 hooks, 按照 hooks 数组中的钩子执行，其中 下标为 1的钩子
+        } catch (IllegalStateException e) {// 执行了ApplicationShutdownHooks.runHooks 方法，该方法，执行了添加到 ApplicationShutdownHooks.hooks中的线程
             // application shutdown hooks cannot be added if
             // shutdown is in progress.
             hooks = null;
@@ -111,7 +111,7 @@ class ApplicationShutdownHooks {
         for (Thread hook : threads) {
             while (true) {
                 try {
-                    hook.join();
+                    hook.join(); // 启动所有线程后等待所有线程运行结束
                     break;
                 } catch (InterruptedException ignored) {
                 }

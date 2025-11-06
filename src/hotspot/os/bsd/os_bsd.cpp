@@ -582,11 +582,11 @@ static void *thread_native_entry(Thread *thread) {
     MutexLocker ml(sync, Mutex::_no_safepoint_check_flag);
 
     // notify parent thread
-    osthread->set_state(INITIALIZED);
-    sync->notify_all();
+    osthread->set_state(INITIALIZED); // 设置线程状态为  INITIALIZED： 从ALLOCATED 转换到 INITIALIZED
+    sync->notify_all(); // 通知父线程
 
     // wait until os::start_thread()
-    while (osthread->get_state() == INITIALIZED) {
+    while (osthread->get_state() == INITIALIZED) { // 等待父线程设置线程状态为 Runnable
       sync->wait_without_safepoint_check();
     }
   }
@@ -595,7 +595,7 @@ static void *thread_native_entry(Thread *thread) {
     os::current_thread_id(), (uintx) pthread_self());
 
   // call one more level start routine
-  thread->call_run();
+  thread->call_run(); // 在上述解锁后执行 run 方法
 
   // Note: at this point the thread object may already have deleted itself.
   // Prevent dereferencing it from here on out.
@@ -612,15 +612,15 @@ bool os::create_thread(Thread* thread, ThreadType thr_type,
   assert(thread->osthread() == nullptr, "caller responsible");
 
   // Allocate the OSThread object
-  OSThread* osthread = new (std::nothrow) OSThread();
+  OSThread* osthread = new (std::nothrow) OSThread(); // 创建OSThread 对象
   if (osthread == nullptr) {
     return false;
   }
 
   // Initial state is ALLOCATED but not INITIALIZED
-  osthread->set_state(ALLOCATED);
+  osthread->set_state(ALLOCATED); // 设置线程状态为 ALLOCATED
 
-  thread->set_osthread(osthread);
+  thread->set_osthread(osthread); // JavaThread 关联 OSThread
 
   // init thread attributes
   pthread_attr_t attr;
@@ -647,7 +647,7 @@ bool os::create_thread(Thread* thread, ThreadType thr_type,
     int trials_remaining = 4;
     useconds_t next_delay = 1000;
     while (true) {
-      ret = pthread_create(&tid, &attr, (void* (*)(void*)) thread_native_entry, thread);
+      ret = pthread_create(&tid, &attr, (void* (*)(void*)) thread_native_entry, thread); // 创建原生线程 执行方法 thread_native_entry，并且传递参数thread
 
       if (ret != EAGAIN) {
         break;
@@ -686,13 +686,13 @@ bool os::create_thread(Thread* thread, ThreadType thr_type,
     }
 
     // Store pthread info into the OSThread
-    osthread->set_pthread_id(tid);
+    osthread->set_pthread_id(tid); // OSThread关联原生线程
 
     // Wait until child thread is either initialized or aborted
     {
       Monitor* sync_with_child = osthread->startThread_lock();
       MutexLocker ml(sync_with_child, Mutex::_no_safepoint_check_flag);
-      while ((state = osthread->get_state()) == ALLOCATED) {
+      while ((state = osthread->get_state()) == ALLOCATED) { // OSThread 状态一直为ALLOCATED，则继续等待 thread_native_entry 里设置为 INITIALIZED，设置后继续后面的循环
         sync_with_child->wait_without_safepoint_check();
       }
     }
@@ -720,13 +720,13 @@ bool os::create_attached_thread(JavaThread* thread) {
 #endif
 
   // Allocate the OSThread object
-  OSThread* osthread = new (std::nothrow) OSThread();
+  OSThread* osthread = new (std::nothrow) OSThread(); // 创建为操作系统线程
 
   if (osthread == nullptr) {
     return false;
   }
 
-  osthread->set_thread_id(os::Bsd::gettid());
+  osthread->set_thread_id(os::Bsd::gettid());// 将当前内核线程ID设置到 osthread 中
 
 #ifdef __APPLE__
   // Store unique OS X thread id used by SA
@@ -734,7 +734,7 @@ bool os::create_attached_thread(JavaThread* thread) {
 #endif
 
   // Store pthread info into the OSThread
-  osthread->set_pthread_id(::pthread_self());
+  osthread->set_pthread_id(::pthread_self()); // 将pthread的线程信息存储到 osthread, 为后续使用作准备
 
   // initialize floating point control register
   os::Bsd::init_thread_fpu_state();
@@ -742,7 +742,7 @@ bool os::create_attached_thread(JavaThread* thread) {
   // Initial thread state is RUNNABLE
   osthread->set_state(RUNNABLE);
 
-  thread->set_osthread(osthread);
+  thread->set_osthread(osthread); // 将 JavaThread 对象与 OSThread 对象绑定
 
   // initialize signal mask for this thread
   // and save the caller's signal mask
@@ -758,9 +758,9 @@ bool os::create_attached_thread(JavaThread* thread) {
 void os::pd_start_thread(Thread* thread) {
   OSThread * osthread = thread->osthread();
   assert(osthread->get_state() != INITIALIZED, "just checking");
-  Monitor* sync_with_child = osthread->startThread_lock();
+  Monitor* sync_with_child = osthread->startThread_lock(); // 解锁之前的等待的线程，要求： OSThread.state 不等于 INITIALIZED
   MutexLocker ml(sync_with_child, Mutex::_no_safepoint_check_flag);
-  sync_with_child->notify();
+  sync_with_child->notify(); // 通知解锁
 }
 
 // Free Bsd resources related to the OSThread

@@ -62,7 +62,7 @@ TruncatePath(char *buf, jboolean pathisdll)
      * directory.
      */
 
-    char *p = findLastPathComponent(buf, pathisdll ? "/lib/" : "/bin/");
+    char *p = findLastPathComponent(buf, pathisdll ? "/lib/" : "/bin/"); // 获取执行命令的后几位，以 /bin/开始
     if (p != NULL) {
         *p = '\0';
         return JNI_TRUE;
@@ -82,7 +82,7 @@ TruncatePath(char *buf, jboolean pathisdll)
 jboolean
 GetApplicationHome(char *buf, jint bufsize)
 {
-    const char *execname = GetExecName();
+    const char *execname = GetExecName(); // 获取执行命令的名称 ，如: 路径/java
     if (execname != NULL) {
         JLI_Snprintf(buf, bufsize, "%s", execname);
         buf[bufsize-1] = '\0';

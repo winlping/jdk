@@ -251,7 +251,7 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argv */
     _is_java_args = javaargs;
     _wc_enabled = cpwildcard;
 
-    InitLauncher(javaw);
+    InitLauncher(javaw); // 获取环境变量 是否debug后设置 TraceLauncher
     DumpState();
     if (JLI_IsTraceLauncher()) {
         char *env_in;
@@ -270,10 +270,10 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argv */
         AddOption("-Dsun.java.launcher.diag=true", NULL);
     }
 
-    CreateExecutionEnvironment(&argc, &argv,
+    CreateExecutionEnvironment(&argc, &argv, // 从此处建立了一个新线程-2，并且重新执行了 main.c 中的main 方法
                                jdkroot, sizeof(jdkroot),
                                jvmpath, sizeof(jvmpath),
-                               jvmcfg, sizeof(jvmcfg));
+                               jvmcfg, sizeof(jvmcfg)); // 建立执行环境，比如检查jre有没有安装和 读取jre的路径
 
     ifn.CreateJavaVM = 0;
     ifn.GetDefaultJavaVMInitArgs = 0;
@@ -282,7 +282,7 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argv */
         start = CurrentTimeMicros();
     }
 
-    if (!LoadJavaVM(jvmpath, &ifn)) {
+    if (!LoadJavaVM(jvmpath, &ifn)) { // 加载 jvm， 绑定创建虚拟机的方法
         return(6);
     }
 
@@ -341,7 +341,7 @@ JLI_Launch(int argc, char ** argv,              /* main argc, argv */
  * named "DestroyJavaVM", but this will be seen as a different
  * thread from the one that executed main, even though they are
  * the same C thread.  This allows mainThread.join() and
- * mainThread.isAlive() to work as expected.
+ * mainThread.isAlive() to work as expected. 将当前线程与主程序分离，分离后线程仍然可能继续运行：关闭资源等操作销毁虚拟机
  */
 #define LEAVE() \
     do { \
@@ -487,11 +487,11 @@ JavaMain(void* _args)
     jfieldID noArgMainField;
     jboolean noArgMain;
 
-    RegisterThread();
+    RegisterThread(); // 啥事儿没干
 
     /* Initialize the virtual machine */
     start = CurrentTimeMicros();
-    if (!InitializeJVM(&vm, &env, &ifn)) {
+    if (!InitializeJVM(&vm, &env, &ifn)) { // 初始化JVM，里面创建 java 层面的main线程
         JLI_ReportErrorMessage(JVM_ERROR1);
         exit(1);
     }
@@ -589,7 +589,7 @@ JavaMain(void* _args)
      * This method also correctly handles launching existing JavaFX
      * applications that may or may not have a Main-Class manifest entry.
      */
-    mainClass = LoadMainClass(env, mode, what);
+    mainClass = LoadMainClass(env, mode, what);// 加载 main 方法所在的class
     CHECK_EXCEPTION_NULL_LEAVE(mainClass);
     /*
      * In some cases when launching an application that needs a helper, e.g., a
@@ -623,7 +623,7 @@ JavaMain(void* _args)
      * The main method is invoked here so that extraneous java stacks are not in
      * the application stack trace.
      */
-
+    // 查找main 方法
     helperClass = GetLauncherHelperClass(env);
     isStaticMainField = (*env)->GetStaticFieldID(env, helperClass, "isStaticMain", "Z");
     CHECK_EXCEPTION_NULL_LEAVE(isStaticMainField);
@@ -632,7 +632,7 @@ JavaMain(void* _args)
     noArgMainField = (*env)->GetStaticFieldID(env, helperClass, "noArgMain", "Z");
     CHECK_EXCEPTION_NULL_LEAVE(noArgMainField);
     noArgMain = (*env)->GetStaticBooleanField(env, helperClass, noArgMainField);
-
+    // 执行main 方法
     if (isStaticMain) {
         if (noArgMain) {
             ret = invokeStaticMainWithoutArgs(env, mainClass);
@@ -665,7 +665,7 @@ JavaMain(void* _args)
         // in the invoked main method, return failure.
         ret = 1;
     }
-    LEAVE();
+    LEAVE(); // 调用main 方法后执行 线程和资源的分离，包活关闭虚拟机
 #if defined(__GNUC__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wreturn-type"
@@ -1503,7 +1503,7 @@ InitializeJVM(JavaVM **pvm, JNIEnv **penv, InvocationFunctions *ifn)
                    i, args.options[i].optionString);
     }
 
-    r = ifn->CreateJavaVM(pvm, (void **)penv, &args);
+    r = ifn->CreateJavaVM(pvm, (void **)penv, &args); // 创建JVM
     JLI_MemFree(options);
     return r == JNI_OK;
 }
@@ -2337,7 +2337,7 @@ ContinueInNewThread(InvocationFunctions* ifn, jlong threadStackSize,
         args.what = what;
         args.ifn = *ifn;
 
-        rslt = CallJavaMainInNewThread(threadStackSize, (void*)&args);
+        rslt = CallJavaMainInNewThread(threadStackSize, (void*)&args); // 在新线程中调用main 方法， Thread-3
         /* If the caller has deemed there is an error we
          * simply return that, otherwise we return the value of
          * the callee

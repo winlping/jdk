@@ -262,7 +262,7 @@ static void *apple_main (void *arg)
         extern int main(int argc, char **argv);
         main_fptr = &main;
 #else
-        main_fptr = (int (*)())dlsym(RTLD_DEFAULT, "main");
+        main_fptr = (int (*)())dlsym(RTLD_DEFAULT, "main"); // 指定 main 方法，重新进入 main.c 的main 方法
 #endif
         if (main_fptr == NULL) {
             JLI_ReportErrorMessageSys("error locating main entrypoint\n");
@@ -285,7 +285,7 @@ static void ParkEventLoop() {
     // Park this thread in the main run loop.
     int32_t result;
     do {
-        result = CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0e20, false);
+        result = CFRunLoopRunInMode(kCFRunLoopDefaultMode, 1.0e20, false); // 第一个线程：执行java 命令的线程，循环等待命令结束， 因为Cocoa的原因，存在这个循环，仅 mac 有
     } while (result != kCFRunLoopRunFinished);
 }
 
@@ -298,7 +298,7 @@ static void MacOSXStartup(int argc, char *argv[]) {
     // Thread already started?
     static jboolean started = false;
     int rc;
-    if (started) {
+    if (started) { // Java 命令启动时，存在 Thread-1 线程，此时 started = false 会执行后续的方法，当Thread-2被线程Thread-1启动后会执行到当前方法，此时 started = true, 不执行后续方法
         return;
     }
     started = true;
@@ -310,12 +310,12 @@ static void MacOSXStartup(int argc, char *argv[]) {
 
     // Fire up the main thread
     pthread_t main_thr;
-    rc = pthread_create(&main_thr, NULL, &apple_main, &args);
+    rc = pthread_create(&main_thr, NULL, &apple_main, &args); // 创建线程， 线程执行的是apple_main 方法
     if (rc != 0) {
         JLI_ReportErrorMessageSys("Could not create main thread, return code: %d\n", rc);
         exit(1);
     }
-    rc = pthread_detach(main_thr);
+    rc = pthread_detach(main_thr); // 分离线程，分离后不能使用 pthread_join 来等待和释放资源，线程运行结束后会操作系统回收线程的资源
     if (rc != 0) {
         JLI_ReportErrorMessage("pthread_detach() failed, return code: %d\n", rc);
         exit(1);
@@ -330,7 +330,7 @@ CreateExecutionEnvironment(int *pargc, char ***pargv,
                            char jvmpath[], jint so_jvmpath,
                            char jvmcfg[], jint so_jvmcfg) {
     /* Compute/set the name of the executable */
-    SetExecname(*pargv);
+    SetExecname(*pargv);  // 设置程序的实际执行路径
 
     char * jvmtype    = NULL;
     int  argc         = *pargc;
@@ -368,7 +368,7 @@ CreateExecutionEnvironment(int *pargc, char ***pargv,
      * thread. Spawn off a new thread to run main() and pass
      * this thread off to the Cocoa event loop.
      */
-    MacOSXStartup(argc, argv);
+    MacOSXStartup(argc, argv); // 因为 Cocoa 的约束，这里需要开启一个新的线程来创建main 线程，这是规则，不是可选项，在Mac os 中如果所有操作不在主线程中执行会出现界面无响应，绘制错误或者崩溃
 
     /*
      * we seem to have everything we need
@@ -521,7 +521,7 @@ LoadJavaVM(const char *jvmpath, InvocationFunctions *ifn)
     }
 
     ifn->CreateJavaVM = (CreateJavaVM_t)
-        dlsym(libjvm, "JNI_CreateJavaVM");
+        dlsym(libjvm, "JNI_CreateJavaVM"); // 创建虚拟机 jni.cpp
     if (ifn->CreateJavaVM == NULL) {
         JLI_ReportErrorMessage(DLL_ERROR2, jvmpath, dlerror());
         return JNI_FALSE;
@@ -697,7 +697,7 @@ static size_t adjustStackSize(size_t stack_size) {
  * Block current thread and continue execution in a new thread.
  */
 int
-CallJavaMainInNewThread(jlong stack_size, void* args) {
+CallJavaMainInNewThread(jlong stack_size, void* args) { // 在新的线程中调用 java 层面的 main 方法
     int rslt;
     pthread_t tid;
     pthread_attr_t attr;
@@ -709,9 +709,9 @@ CallJavaMainInNewThread(jlong stack_size, void* args) {
     }
     pthread_attr_setguardsize(&attr, 0); // no pthread guard page on java threads
 
-    if (pthread_create(&tid, &attr, ThreadJavaMain, args) == 0) {
+    if (pthread_create(&tid, &attr, ThreadJavaMain, args) == 0) { // 创建用于执行 main的线程后，原线程等待main线程执行结束
         void* tmp;
-        pthread_join(tid, &tmp);
+        pthread_join(tid, &tmp); // 此处用于等待java 层面的线程结束
         rslt = (int)(intptr_t)tmp;
     } else {
        /*
@@ -924,7 +924,7 @@ JVMInit(InvocationFunctions* ifn, jlong threadStackSize,
         [pool drain];
         return rslt;
     } else {
-        return ContinueInNewThread(ifn, threadStackSize, argc, argv, mode, what, ret);
+        return ContinueInNewThread(ifn, threadStackSize, argc, argv, mode, what, ret); //在新线程里执行虚拟机 vm的初始化
     }
 }
 

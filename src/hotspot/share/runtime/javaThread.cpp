@@ -649,13 +649,13 @@ void JavaThread::block_if_vm_exited() {
 }
 
 JavaThread::JavaThread(ThreadFunction entry_point, size_t stack_sz, MemTag mem_tag) : JavaThread(mem_tag) {
-  set_entry_point(entry_point);
+  set_entry_point(entry_point); // 设置回调函数，调用 run 方法
   // Create the native thread itself.
   // %note runtime_23
   os::ThreadType thr_type = os::java_thread;
   thr_type = entry_point == &CompilerThread::thread_entry ? os::compiler_thread :
                                                             os::java_thread;
-  os::create_thread(this, thr_type, stack_sz);
+  os::create_thread(this, thr_type, stack_sz); // 创建OSThread 和原生线程，建立关联关系；设置线程状态变更
   // The _osthread may be null here because we ran out of memory (too many threads active).
   // We need to throw and OutOfMemoryError - however we cannot do this here because the caller
   // may hold a lock and all locks must be unlocked before throwing the exception (throwing
@@ -718,7 +718,7 @@ void JavaThread::pre_run() {
 // which defines the actual logic for that kind of thread.
 void JavaThread::run() {
   // initialize thread-local alloc buffer related fields
-  initialize_tlab();
+  initialize_tlab(); // 初始化线程
 
   _stack_overflow_state.create_stack_guard_pages();
 
@@ -756,7 +756,7 @@ void JavaThread::run() {
 
   // We call another function to do the rest so we are sure that the stack addresses used
   // from there will be lower than the stack base just computed.
-  thread_main_inner();
+  thread_main_inner(); // 执行线程调用
 }
 
 void JavaThread::thread_main_inner() {
@@ -771,7 +771,7 @@ void JavaThread::thread_main_inner() {
       this->set_native_thread_name(this->name());
     }
     HandleMark hm(this);
-    this->entry_point()(this, this);
+    this->entry_point()(this, this);// 回调 Calls 调用run 方法
   }
 
   DTRACE_THREAD_PROBE(stop, this);
@@ -781,11 +781,11 @@ void JavaThread::thread_main_inner() {
 
 // Shared teardown for all JavaThreads
 void JavaThread::post_run() {
-  this->exit(false);
+  this->exit(false);// 调用java 层面的退出方法
   this->unregister_thread_stack_with_NMT();
   // Defer deletion to here to ensure 'this' is still referenceable in call_run
   // for any shared tear-down.
-  this->smr_delete();
+  this->smr_delete(); // 释放分配给线程的空间
 }
 
 static void ensure_join(JavaThread* thread) {
@@ -842,7 +842,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
                               threadObj, thread_klass,
                               vmSymbols::dispatchUncaughtException_name(),
                               vmSymbols::throwable_void_signature(),
-                              uncaught_exception,
+                              uncaught_exception, // 处理线程内未捕获，抛出到 run 方法以外的线程，回调Thread类对象的dispatchUncaughtException 方法
                               THREAD);
       if (HAS_PENDING_EXCEPTION) {
         ResourceMark rm(this);
@@ -867,7 +867,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
       Klass* thread_klass = vmClasses::Thread_klass();
       JavaCalls::call_virtual(&result,
                               threadObj, thread_klass,
-                              vmSymbols::exit_method_name(),
+                              vmSymbols::exit_method_name(), // 回调Java 层面的 exit 方法
                               vmSymbols::void_method_signature(),
                               THREAD);
       CLEAR_PENDING_EXCEPTION;
@@ -1009,7 +1009,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
 
   // Remove from list of active threads list, and notify VM thread if we are the last non-daemon thread.
   // We call BarrierSet::barrier_set()->on_thread_detach() here so no touching of oops after this point.
-  Threads::remove(this, daemon);
+  Threads::remove(this, daemon); // 清理当前线程
 
   if (log_is_enabled(Debug, os, thread, timer)) {
     _timer_exit_phase4.stop();
@@ -1739,7 +1739,7 @@ void JavaThread::prepare(jobject jni_thread, ThreadPriority prio) {
   // It is crucial that we do not block before the thread is
   // added to the Threads list for if a GC happens, then the java_thread oop
   // will not be visited by GC.
-  Threads::add(this);
+  Threads::add(this); // 将线程添加到链表
   // Publish the JavaThread* in java.lang.Thread after the JavaThread* is
   // on a ThreadsList. We don't want to wait for the release when the
   // Theads_lock is dropped somewhere in the caller since the JavaThread*
@@ -2149,7 +2149,7 @@ bool JavaThread::sleep_nanos(jlong nanos) {
 }
 
 // Last thread running calls java.lang.Shutdown.shutdown()
-void JavaThread::invoke_shutdown_hooks() {
+void JavaThread::invoke_shutdown_hooks() { // 调用狗子函数
   HandleMark hm(this);
 
   // We could get here with a pending exception, if so clear it now.
@@ -2160,7 +2160,7 @@ void JavaThread::invoke_shutdown_hooks() {
   EXCEPTION_MARK;
   Klass* shutdown_klass =
     SystemDictionary::resolve_or_null(vmSymbols::java_lang_Shutdown(),
-                                      THREAD);
+                                      THREAD);// 回调获取Shutdown 类
   if (shutdown_klass != nullptr) {
     // SystemDictionary::resolve_or_null will return null if there was
     // an exception.  If we cannot load the Shutdown class, just don't
@@ -2171,7 +2171,7 @@ void JavaThread::invoke_shutdown_hooks() {
     JavaValue result(T_VOID);
     JavaCalls::call_static(&result,
                            shutdown_klass,
-                           vmSymbols::shutdown_name(),
+                           vmSymbols::shutdown_name(), // 回调shutdown 方法
                            vmSymbols::void_method_signature(),
                            THREAD);
   }

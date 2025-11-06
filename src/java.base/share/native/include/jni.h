@@ -1896,7 +1896,7 @@ struct JNIEnv_ {
 /*
  * optionString may be any option accepted by the JVM, or one of the
  * following:
- *
+ *instanceHandle
  * -D<name>=<value>          Set a system property.
  * -verbose[:class|gc|jni]   Enable verbose output, comma-separated. E.g.
  *                           "-verbose:class" or "-verbose:gc,class"

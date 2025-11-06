@@ -2754,7 +2754,7 @@ static void thread_entry(JavaThread* thread, TRAPS) {
 }
 
 
-JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
+JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread)) // Thread.start() 启动线程入口
 #if INCLUDE_CDS
   if (CDSConfig::allow_only_single_java_thread()) {
     // During java -Xshare:dump, if we allow multiple Java threads to
@@ -2788,7 +2788,7 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
     ConditionalMutexLocker throttle_ml(ThreadsLockThrottle_lock, UseThreadsLockThrottleLock);
     // Ensure that the C++ Thread and OSThread structures aren't freed before
     // we operate.
-    MutexLocker ml(Threads_lock);
+    MutexLocker ml(Threads_lock); // 获取锁
 
     // Since JDK 5 the java.lang.Thread threadStatus is used to prevent
     // re-starting an already started thread, so we should usually find
@@ -2800,7 +2800,7 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
       throw_illegal_thread_state = true;
     } else {
       jlong size =
-             java_lang_Thread::stackSize(JNIHandles::resolve_non_null(jthread));
+             java_lang_Thread::stackSize(JNIHandles::resolve_non_null(jthread)); // 设置线程栈大小
       // Allocate the C++ Thread structure and create the native thread.  The
       // stack size retrieved from java is 64-bit signed, but the constructor takes
       // size_t (an unsigned type), which may be 32 or 64-bit depending on the platform.
@@ -2808,7 +2808,7 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
       //  - Avoid passing negative values which would result in really large stacks.
       NOT_LP64(if (size > SIZE_MAX) size = SIZE_MAX;)
       size_t sz = size > 0 ? (size_t) size : 0;
-      native_thread = new JavaThread(&thread_entry, sz);
+      native_thread = new JavaThread(&thread_entry, sz); // 创建一个原生线程 thread_entry
 
       // At this point it may be possible that no osthread was created for the
       // JavaThread due to lack of memory. Check for this situation and throw
@@ -2818,7 +2818,7 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
       // JavaThread constructor.
       if (native_thread->osthread() != nullptr) {
         // Note: the current thread is not being used within "prepare".
-        native_thread->prepare(jthread);
+        native_thread->prepare(jthread); // 执行线程的准备工作：加入到线程链表中，设置线程的权重
       }
     }
   }
@@ -2846,11 +2846,11 @@ JVM_ENTRY(void, JVM_StartThread(JNIEnv* env, jobject jthread))
 
   JFR_ONLY(Jfr::on_java_thread_start(thread, native_thread);)
 
-  Thread::start(native_thread);
+  Thread::start(native_thread); // 启动线程，此处修改线程状态为 Runnable
 
 JVM_END
 
-
+// 设置线程的优先级
 JVM_ENTRY(void, JVM_SetThreadPriority(JNIEnv* env, jobject jthread, jint prio))
   ThreadsListHandle tlh(thread);
   oop java_thread = nullptr;

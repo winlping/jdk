@@ -681,7 +681,7 @@ ThreadsList *ThreadsList::add_thread(ThreadsList *list, JavaThread *java_thread)
   const uint head_length = index;
   ThreadsList *const new_list = new ThreadsList(new_length);
 
-  if (head_length > 0) {
+  if (head_length > 0) { // 如果存量线程数大于 0 ，则追加到链表末尾
     Copy::disjoint_words((HeapWord*)list->_threads, (HeapWord*)new_list->_threads, head_length);
   }
   *(JavaThread**)(new_list->_threads + index) = java_thread;
@@ -754,18 +754,18 @@ bool ThreadsList::includes(const JavaThread * const p) const {
 ThreadsList *ThreadsList::remove_thread(ThreadsList* list, JavaThread* java_thread) {
   assert(list->_length > 0, "sanity");
 
-  uint i = (uint)list->find_index_of_JavaThread(java_thread);
+  uint i = (uint)list->find_index_of_JavaThread(java_thread); // 查找当前线程在链表上的索引位置
   assert(i < list->_length, "did not find JavaThread on the list");
   const uint index = i;
-  const uint new_length = list->_length - 1;
-  const uint head_length = index;
-  const uint tail_length = (new_length >= index) ? (new_length - index) : 0;
+  const uint new_length = list->_length - 1; // 当前链表长度 减 1 = 新链表长度
+  const uint head_length = index; // 当前索引位置到头部的长度
+  const uint tail_length = (new_length >= index) ? (new_length - index) : 0; // new_length > index 说明，结束的是链表中间的线程：结束线程到末尾线程的长度，即还有所少个线程
   ThreadsList *const new_list = new ThreadsList(new_length);
-
+  // [0,1,2,3,4,*,6,7,8] 此处将链表中的0,1,2,3,4放到新链表中
   if (head_length > 0) {
     Copy::disjoint_words((HeapWord*)list->_threads, (HeapWord*)new_list->_threads, head_length);
   }
-  if (tail_length > 0) {
+  if (tail_length > 0) {// 此处将链表中的6,7,8放到新链表中
     Copy::disjoint_words((HeapWord*)list->_threads + index + 1, (HeapWord*)new_list->_threads + index, tail_length);
   }
 
@@ -855,7 +855,7 @@ FastThreadsListHandle::FastThreadsListHandle(oop thread_oop, JavaThread* java_th
 }
 
 void ThreadsSMRSupport::add_thread(JavaThread *thread){
-  ThreadsList *new_list = ThreadsList::add_thread(get_java_thread_list(), thread);
+  ThreadsList *new_list = ThreadsList::add_thread(get_java_thread_list(), thread); // 添加线程到链表
   if (EnableThreadSMRStatistics) {
     inc_java_thread_list_alloc_cnt();
     update_java_thread_list_max(new_list->length());
@@ -863,8 +863,8 @@ void ThreadsSMRSupport::add_thread(JavaThread *thread){
   // Initial _java_thread_list will not generate a "Threads::add" mesg.
   log_debug(thread, smr)("tid=%zu: Threads::add: new ThreadsList=" INTPTR_FORMAT, os::current_thread_id(), p2i(new_list));
 
-  ThreadsList *old_list = xchg_java_thread_list(new_list);
-  free_list(old_list);
+  ThreadsList *old_list = xchg_java_thread_list(new_list); // 原子替换线程链表
+  free_list(old_list); // 释放原线程链表
   if (ThreadIdTable::is_initialized()) {
     jlong tid = SharedRuntime::get_java_tid(thread);
     ThreadIdTable::add_thread(tid, thread);
@@ -1020,7 +1020,7 @@ void ThreadsSMRSupport::release_stable_list_wake_up(bool is_nested) {
 }
 
 void ThreadsSMRSupport::remove_thread(JavaThread *thread) {
-  ThreadsList *new_list = ThreadsList::remove_thread(ThreadsSMRSupport::get_java_thread_list(), thread);
+  ThreadsList *new_list = ThreadsList::remove_thread(ThreadsSMRSupport::get_java_thread_list(), thread); // 从链表中移除线程
   if (EnableThreadSMRStatistics) {
     ThreadsSMRSupport::inc_java_thread_list_alloc_cnt();
     // This list is smaller so no need to check for a "longest" update.
@@ -1029,8 +1029,8 @@ void ThreadsSMRSupport::remove_thread(JavaThread *thread) {
   // Final _java_thread_list will not generate a "Threads::remove" mesg.
   log_debug(thread, smr)("tid=%zu: Threads::remove: new ThreadsList=" INTPTR_FORMAT, os::current_thread_id(), p2i(new_list));
 
-  ThreadsList *old_list = ThreadsSMRSupport::xchg_java_thread_list(new_list);
-  ThreadsSMRSupport::free_list(old_list);
+  ThreadsList *old_list = ThreadsSMRSupport::xchg_java_thread_list(new_list);// 原子替换链表
+  ThreadsSMRSupport::free_list(old_list); // 释放老的线程链表
 }
 
 // See note for clear_delete_notify().

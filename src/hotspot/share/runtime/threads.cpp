@@ -148,17 +148,17 @@ static Handle create_initial_thread_group(TRAPS) {
 // Creates the initial Thread, and sets it to running.
 static void create_initial_thread(Handle thread_group, JavaThread* thread,
                                  TRAPS) {
-  InstanceKlass* ik = vmClasses::Thread_klass();
+  InstanceKlass* ik = vmClasses::Thread_klass(); // 加载并初始化线程类
   assert(ik->is_initialized(), "must be");
-  instanceHandle thread_oop = ik->allocate_instance_handle(CHECK);
+  instanceHandle thread_oop = ik->allocate_instance_handle(CHECK); // 分配一个instanceHandle 返回Thread 对象的构造方法
 
   // Cannot use JavaCalls::construct_new_instance because the java.lang.Thread
   // constructor calls Thread.current(), which must be set here for the
   // initial thread.
-  java_lang_Thread::set_thread(thread_oop(), thread);
-  thread->set_threadOopHandles(thread_oop());
+  java_lang_Thread::set_thread(thread_oop(), thread);// Thread oop实例保存关联的JavaThread
+  thread->set_threadOopHandles(thread_oop()); // JavaThread保存关联的Thread实例oop
 
-  Handle string = java_lang_String::create_from_str("main", CHECK);
+  Handle string = java_lang_String::create_from_str("main", CHECK); // 设置线程名为 main
 
   JavaValue result(T_VOID);
   JavaCalls::call_special(&result, thread_oop,
@@ -167,7 +167,7 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
                           vmSymbols::threadgroup_string_void_signature(),
                           thread_group,
                           string,
-                          CHECK);
+                          CHECK); // 调用Thread的构造方法，创建Thread实例保存在thread_oop中，此时才在java层面创建线程Thread对象
 
   DEBUG_ONLY(int64_t main_thread_tid = java_lang_Thread::thread_id(thread_oop());)
   assert(main_thread_tid == ThreadIdentifier::initial(), "");
@@ -177,7 +177,7 @@ static void create_initial_thread(Handle thread_group, JavaThread* thread,
   // Set thread status to running since main thread has
   // been started and running.
   java_lang_Thread::set_thread_status(thread_oop(),
-                                      JavaThreadStatus::RUNNABLE);
+                                      JavaThreadStatus::RUNNABLE);// 设置线程状态为运行状态
 }
 
 // Extract version and vendor specific information from
@@ -355,10 +355,10 @@ void Threads::initialize_java_lang_classes(JavaThread* main_thread, TRAPS) {
   initialize_class(vmSymbols::java_lang_Class(), CHECK);
 
   initialize_class(vmSymbols::java_lang_ThreadGroup(), CHECK);
-  Handle thread_group = create_initial_thread_group(CHECK);
+  Handle thread_group = create_initial_thread_group(CHECK); // 创建java 层面的 ThreadGroup 对象
   Universe::set_main_thread_group(thread_group());
   initialize_class(vmSymbols::java_lang_Thread(), CHECK);
-  create_initial_thread(thread_group, main_thread, CHECK);
+  create_initial_thread(thread_group, main_thread, CHECK); // 将java 层面的 ThreadGroup 对象与main_thread与 java 层面的Thread 关联
 
   HeapShared::init_box_classes(CHECK);
 
@@ -555,7 +555,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   JavaThread::_thread_oop_storage = OopStorageSet::create_strong("Thread OopStorage", mtThread);
 
   // Attach the main thread to this os thread
-  JavaThread* main_thread = new JavaThread();
+  JavaThread* main_thread = new JavaThread(); // 在创建虚拟机的过程中 创建 JavaThread 对象，此对象用于绑定 java 层面的线程对象
   main_thread->set_thread_state(_thread_in_vm);
   main_thread->initialize_thread_current();
   // Once mutexes and main_thread are ready, we can use NmtVirtualMemoryLocker.
@@ -570,7 +570,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   // is even created. The same value will be assigned to the Thread instance on init.
   main_thread->set_monitor_owner_id(ThreadIdentifier::next());
 
-  if (!Thread::set_as_starting_thread(main_thread)) {
+  if (!Thread::set_as_starting_thread(main_thread)) { // 设置为启动线程
     vm_shutdown_during_initialization(
                                       "Failed necessary internal allocation. Out of swap space");
     main_thread->smr_delete();
@@ -585,7 +585,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
   main_thread->stack_overflow_state()->create_stack_guard_pages();
 
   // Initialize Java-Level synchronization subsystem
-  ObjectMonitor::Initialize();
+  ObjectMonitor::Initialize(); // 初始化 synchronization 锁
   ObjectSynchronizer::initialize();
 
   // Initialize global modules
@@ -688,7 +688,7 @@ jint Threads::create_vm(JavaVMInitArgs* args, bool* canTryAgain) {
     JvmtiAgentList::load_xrun_agents();
   }
 
-  initialize_java_lang_classes(main_thread, CHECK_JNI_ERR);
+  initialize_java_lang_classes(main_thread, CHECK_JNI_ERR); // 这里创建java 层面的线程对象并与 main_thread 关联
 
   quicken_jni_functions();
 
@@ -951,7 +951,7 @@ void Threads::destroy_vm() {
   int expected = daemon ? 0 : 1;
   {
     MonitorLocker nu(Threads_lock);
-    while (Threads::number_of_non_daemon_threads() > expected)
+    while (Threads::number_of_non_daemon_threads() > expected) // 循环等待，当前线程是守护线程，则存在用户线程则继续等待，如果当前线程是用户线程，则仅有一个用户线程才不等待
       // This wait should make safepoint checks, wait without a timeout.
       nu.wait(0);
   }
@@ -969,7 +969,7 @@ void Threads::destroy_vm() {
   os::wait_for_keypress_at_exit();
 
   // run Java level shutdown hooks
-  thread->invoke_shutdown_hooks();
+  thread->invoke_shutdown_hooks();// 执行钩子线程
 
   before_exit(thread);
 
@@ -1073,21 +1073,21 @@ void Threads::add(JavaThread* p, bool force_daemon) {
   // to be used to delete it. Otherwise we can just delete it directly.
   p->set_on_thread_list();
 
-  _number_of_threads++;
+  _number_of_threads++; // 线程数 加 1
   oop threadObj = p->threadObj();
   bool daemon = true;
   // Bootstrapping problem: threadObj can be null for initial
   // JavaThread (or for threads attached via JNI)
   if (!force_daemon &&
       (threadObj == nullptr || !java_lang_Thread::is_daemon(threadObj))) {
-    _number_of_non_daemon_threads++;
+    _number_of_non_daemon_threads++; // 用户线程数 加 1
     daemon = false;
   }
 
   ThreadService::add_thread(p, daemon);
 
   // Maintain fast thread list
-  ThreadsSMRSupport::add_thread(p);
+  ThreadsSMRSupport::add_thread(p); // 将线程 添加到链表
 
   // Increase the ObjectMonitor ceiling for the new thread.
   ObjectSynchronizer::inc_in_use_list_ceiling();
@@ -1104,7 +1104,7 @@ void Threads::remove(JavaThread* p, bool is_daemon) {
   // that we do not remove thread without safepoint code notice
   {
     ConditionalMutexLocker throttle_ml(ThreadsLockThrottle_lock, UseThreadsLockThrottleLock);
-    MonitorLocker ml(Threads_lock);
+    MonitorLocker ml(Threads_lock); // 设置锁，防止并发线程移除，关于链表的 原子替换
 
     if (ThreadIdTable::is_initialized()) {
       // This cleanup must be done before the current thread's GC barrier
@@ -1122,23 +1122,23 @@ void Threads::remove(JavaThread* p, bool is_daemon) {
       // If we got here via JavaThread::exit(), then we remember that the
       // thread's GC barrier has been detached. We don't do this when we get
       // here from another path, e.g., cleanup_failed_attach_current_thread().
-      p->set_terminated(JavaThread::_thread_gc_barrier_detached);
+      p->set_terminated(JavaThread::_thread_gc_barrier_detached); // 设置线程关闭状态
     }
 
     assert(ThreadsSMRSupport::get_java_thread_list()->includes(p), "p must be present");
 
     // Maintain fast thread list
-    ThreadsSMRSupport::remove_thread(p);
+    ThreadsSMRSupport::remove_thread(p);// 移除线程，并且释放原来线程链表的内存空间
 
-    _number_of_threads--;
-    if (!is_daemon) {
+    _number_of_threads--;// 线程数减1
+    if (!is_daemon) {// 用户线程进入到这里
       _number_of_non_daemon_threads--;
 
       // If this is the last non-daemon thread then we need to do
       // a notify on the Threads_lock so a thread waiting
       // on destroy_vm will wake up. But that thread could be a daemon
       // or non-daemon, so we notify for both the 0 and 1 case.
-      if (number_of_non_daemon_threads() <= 1) {
+      if (number_of_non_daemon_threads() <= 1) {// 最后一个用户线程结束后要通知 destroy_vm 线程执行 虚拟机销毁
         ml.notify_all();
       }
     }
@@ -1148,7 +1148,7 @@ void Threads::remove(JavaThread* p, bool is_daemon) {
     // the thread might mess around with locks after this point. This can cause it
     // to do callbacks into the safepoint code. However, the safepoint code is not aware
     // of this thread since it is removed from the queue.
-    p->set_terminated(JavaThread::_thread_terminated);
+    p->set_terminated(JavaThread::_thread_terminated); // 设置线程已经从 线程链表中移除
 
     // Notify threads waiting in EscapeBarriers
     EscapeBarrier::thread_removed(p);

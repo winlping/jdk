@@ -102,7 +102,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
     private ThreadGroup() {
         this.parent = null;
         this.name = "system";
-        this.maxPriority = Thread.MAX_PRIORITY;
+        this.maxPriority = Thread.MAX_PRIORITY; // 线程组默认的最高优先级为最大 10；
     }
 
     /**
@@ -311,7 +311,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          group as an ancestor
      */
     public int activeCount() {
-        int n = 0;
+        int n = 0;// 计算以当前线程组为父group,或者直接以当前线程组为线程组的线程数
         for (Thread thread : Thread.getAllThreads()) {
             ThreadGroup g = thread.getThreadGroup();
             if (parentOf(g)) {
@@ -400,7 +400,7 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      *          an ancestor
      */
     public int activeGroupCount() {
-        int n = 0;
+        int n = 0; // 当前线活动的线程组
         for (ThreadGroup group : synchronizedSubgroups()) {
             n = n + group.activeGroupCount() + 1;
         }
@@ -568,10 +568,10 @@ public class ThreadGroup implements Thread.UncaughtExceptionHandler {
      */
     public void uncaughtException(Thread t, Throwable e) {
         if (parent != null) {
-            parent.uncaughtException(t, e);
+            parent.uncaughtException(t, e);// 线程未处理的异常，如果有父线程组存在交由父线程组处理，即顶级父线程处理
         } else {
             Thread.UncaughtExceptionHandler ueh =
-                Thread.getDefaultUncaughtExceptionHandler();
+                Thread.getDefaultUncaughtExceptionHandler(); // 可以为线程设置 静态 的默认异常处理器
             if (ueh != null) {
                 ueh.uncaughtException(t, e);
             } else {

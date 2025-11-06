@@ -250,7 +250,7 @@ void Thread::call_run() {
 
   // Perform <ChildClass> tear-down actions
   DEBUG_ONLY(_run_state = POST_RUN;)
-  this->post_run();
+  this->post_run(); // run 方法执行结束后，执行后置运行方法：里面执行了java 层面的exit方法，并且清理了线程链表，如果为最后一个用户线程则通知销毁虚拟机的线程执行
 
   // Note: at this point the thread object may already have deleted itself,
   // so from here on do not dereference *this*. Not all thread types currently
@@ -405,10 +405,10 @@ void Thread::start(Thread* thread) {
     // Can not set it after the thread started because we do not know the
     // exact thread state at that time. It could be in MONITOR_WAIT or
     // in SLEEPING or some other state.
-    java_lang_Thread::set_thread_status(JavaThread::cast(thread)->threadObj(),
+    java_lang_Thread::set_thread_status(JavaThread::cast(thread)->threadObj(), // 设置线程状态为 RUNNABLE： NEW -> RUNNABLE
                                         JavaThreadStatus::RUNNABLE);
   }
-  os::start_thread(thread);
+  os::start_thread(thread); // 设置系统线程的状态，解锁前面因状态等待的线程
 }
 
 // GC Support
