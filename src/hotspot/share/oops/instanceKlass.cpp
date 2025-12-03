@@ -1200,7 +1200,7 @@ void InstanceKlass::initialize_impl(TRAPS) {
   // Step 1
   {
     Handle h_init_lock(THREAD, init_lock());
-    ObjectLocker ol(h_init_lock, jt);
+    ObjectLocker ol(h_init_lock, jt);// 进入获取锁
 
     // Step 2
     // If we were to use wait() instead of waitInterruptibly() then

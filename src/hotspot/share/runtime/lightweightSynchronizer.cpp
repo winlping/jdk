@@ -549,7 +549,7 @@ inline static ObjectMonitor* read_caches(JavaThread* current, BasicLock* lock, o
 }
 
 class LightweightSynchronizer::VerifyThreadState {
-  bool _no_safepoint;
+  bool _no_safepoint; // 持有锁的线程和当前线程是否同一个线程的对象比较，用来判断当前线程状态是否需要在安全点执行。。。操作
 
  public:
   VerifyThreadState(JavaThread* locking_thread, JavaThread* current) : _no_safepoint(locking_thread != current) {
@@ -565,18 +565,18 @@ class LightweightSynchronizer::VerifyThreadState {
     }
   }
 };
-
+// 获取轻量级锁
 inline bool LightweightSynchronizer::fast_lock_try_enter(oop obj, LockStack& lock_stack, JavaThread* current) {
   markWord mark = obj->mark();
-  while (mark.is_unlocked()) {
+  while (mark.is_unlocked()) {// 如果是无锁状态
     ensure_lock_stack_space(current);
     assert(!lock_stack.is_full(), "must have made room on the lock stack");
     assert(!lock_stack.contains(obj), "thread must not already hold the lock");
     // Try to swing into 'fast-locked' state.
-    markWord locked_mark = mark.set_fast_locked();
+    markWord locked_mark = mark.set_fast_locked();// 设置轻量级锁的对象头，此处返回的是新的markWord对象，将锁标志位设置为 00，其他位保留
     markWord old_mark = mark;
-    mark = obj->cas_set_mark(locked_mark, old_mark);
-    if (old_mark == mark) {
+    mark = obj->cas_set_mark(locked_mark, old_mark);// 设置新对象头，返回旧的对象头，cas 线程竞争后mark 改为前一个线程设置的mark值，再次进行循环，发现已经设置了轻量级锁则推出循环，返回false
+    if (old_mark == mark) {// 如果设置成功表示获取到锁，需要将此对象放在线程栈中
       // Successfully fast-locked, push object to lock-stack and return.
       lock_stack.push(obj);
       return true;
@@ -655,7 +655,7 @@ void LightweightSynchronizer::enter_for(Handle obj, BasicLock* lock, JavaThread*
   assert(monitor != nullptr, "LightweightSynchronizer::enter_for must succeed");
   assert(!UseObjectMonitorTable || lock->object_monitor_cache() == nullptr, "unused. already cleared");
 }
-
+// 轻量级锁同步器
 void LightweightSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current) {
   assert(LockingMode == LM_LIGHTWEIGHT, "must be");
   assert(current == JavaThread::current(), "must be");
@@ -664,7 +664,7 @@ void LightweightSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* cur
     ObjectSynchronizer::handle_sync_on_value_based_class(obj, current);
   }
 
-  CacheSetter cache_setter(current, lock);
+  CacheSetter cache_setter(current, lock);// 缓存线程和锁对象，储备后面使用
 
   // Used when deflation is observed. Progress here requires progress
   // from the deflator. After observing that the deflator is not
@@ -674,13 +674,13 @@ void LightweightSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* cur
 
   LockStack& lock_stack = current->lock_stack();
 
-  if (!lock_stack.is_full() && lock_stack.try_recursive_enter(obj())) {
+  if (!lock_stack.is_full() && lock_stack.try_recursive_enter(obj())) { // 如果线程锁的栈没有满，并且锁能进入到栈中；当线程第一次进入同步块时线程栈中原本存储的对象，当没有发生竞争时重入会累加到栈中，栈醉倒支持8个同步锁，超过则返回false,此处容量为8是性能优化
     // Recursively fast locked
     return;
   }
 
-  if (lock_stack.contains(obj())) {
-    ObjectMonitor* monitor = inflate_fast_locked_object(obj(), ObjectSynchronizer::inflate_cause_monitor_enter, current, current);
+  if (lock_stack.contains(obj())) {// 已经持有轻量级锁会进去此处
+    ObjectMonitor* monitor = inflate_fast_locked_object(obj(), ObjectSynchronizer::inflate_cause_monitor_enter, current, current);// 膨胀轻量级锁，获取对象监视器
     bool entered = monitor->enter(current);
     assert(entered, "recursive ObjectMonitor::enter must succeed");
     cache_setter.set_monitor(monitor);
@@ -693,16 +693,16 @@ void LightweightSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* cur
     // The goal is to only inflate when the extra cost of using ObjectMonitors
     // is worth it.
     // If deflation has been observed we also spin while deflation is ongoing.
-    if (fast_lock_try_enter(obj(), lock_stack, current)) {
+    if (fast_lock_try_enter(obj(), lock_stack, current)) {// 尝试获取轻量级锁
       return;
     } else if (UseObjectMonitorTable && fast_lock_spin_enter(obj(), lock_stack, current, observed_deflation)) {
       return;
     }
 
-    if (observed_deflation) {
-      spin_yield.wait();
+    if (observed_deflation) {// 如果出现了重量级锁优化回收，则进行等待
+      spin_yield.wait();// 两阶段等待，对锁等待的性能优化
     }
-
+    // 升级为重量级锁
     ObjectMonitor* monitor = inflate_and_enter(obj(), lock, ObjectSynchronizer::inflate_cause_monitor_enter, current, current);
     if (monitor != nullptr) {
       cache_setter.set_monitor(monitor);
@@ -713,7 +713,7 @@ void LightweightSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* cur
     // was encountered. Fallback to fast locking. The deflater is responsible
     // for clearing out the monitor and transitioning the markWord back to
     // fast locking.
-    observed_deflation = true;
+    observed_deflation = true;// 重量级锁被优化回收
   }
 }
 
@@ -726,11 +726,11 @@ void LightweightSynchronizer::exit(oop object, BasicLock* lock, JavaThread* curr
 
   LockStack& lock_stack = current->lock_stack();
   if (mark.is_fast_locked()) {
-    if (lock_stack.try_recursive_exit(object)) {
-      // This is a recursive exit which succeeded
+    if (lock_stack.try_recursive_exit(object)) {// 持有该锁的线程仅持有这一个锁对象时并且没有重入其他锁对象，栈顶的锁就是当前锁，此时会退出
+      // This is a recursive exit which succeeded // 主要解决重入锁的推出
       return;
     }
-    if (lock_stack.is_recursive(object)) {
+    if (lock_stack.is_recursive(object)) {// 如果从栈顶开始遍历上层对象相同下层对象不同，则不需要膨胀；膨胀表示中间进入了其他锁对象
       // Must inflate recursive locks if try_recursive_exit fails
       // This happens for un-structured unlocks, could potentially
       // fix try_recursive_exit to handle these.
@@ -738,18 +738,18 @@ void LightweightSynchronizer::exit(oop object, BasicLock* lock, JavaThread* curr
     }
   }
 
-  while (mark.is_fast_locked()) {
+  while (mark.is_fast_locked()) {// 非重入轻量级锁的解锁
     markWord unlocked_mark = mark.set_unlocked();
     markWord old_mark = mark;
     mark = object->cas_set_mark(unlocked_mark, old_mark);
     if (old_mark == mark) {
       // CAS successful, remove from lock_stack
-      size_t recursion = lock_stack.remove(object) - 1;
+      size_t recursion = lock_stack.remove(object) - 1;// 移除栈内的锁对象
       assert(recursion == 0, "Should not have unlocked here");
       return;
     }
   }
-
+  // 以下时重量级锁的推出
   assert(mark.has_monitor(), "must be");
   // The monitor exists
   ObjectMonitor* monitor;
@@ -761,7 +761,7 @@ void LightweightSynchronizer::exit(oop object, BasicLock* lock, JavaThread* curr
   } else {
     monitor = ObjectSynchronizer::read_monitor(mark);
   }
-  if (monitor->has_anonymous_owner()) {
+  if (monitor->has_anonymous_owner()) { // 其他线程膨胀导致的匿名拥有者，在推出前需要设置锁的拥有者，并且移除栈内元素
     assert(current->lock_stack().contains(object), "current must have object on its lock stack");
     monitor->set_owner_from_anonymous(current);
     monitor->set_recursions(current->lock_stack().remove(object) - 1);
@@ -823,7 +823,7 @@ ObjectMonitor* LightweightSynchronizer::inflate_locked_or_imse(oop obj, ObjectSy
     }
   }
 }
-
+// 登记轻量级锁标记到对象头
 ObjectMonitor* LightweightSynchronizer::inflate_into_object_header(oop object, ObjectSynchronizer::InflateCause cause, JavaThread* locking_thread, Thread* current) {
 
   // The JavaThread* locking_thread parameter is only used by LM_LIGHTWEIGHT and requires
@@ -850,7 +850,7 @@ ObjectMonitor* LightweightSynchronizer::inflate_into_object_header(oop object, O
     // *  unlocked     - Aggressively inflate the object.
 
     // CASE: inflated
-    if (mark.has_monitor()) {
+    if (mark.has_monitor()) {// 如果已经膨胀为重量级锁
       ObjectMonitor* inf = mark.monitor();
       markWord dmw = inf->header();
       assert(dmw.is_neutral(), "invariant: header=" INTPTR_FORMAT, dmw.value());
@@ -873,9 +873,9 @@ ObjectMonitor* LightweightSynchronizer::inflate_into_object_header(oop object, O
     // to anonymous. If we lose the race to set the object's mark to the
     // new ObjectMonitor, then we just delete it and loop around again.
     //
-    if (mark.is_fast_locked()) {
+    if (mark.is_fast_locked()) {// 如果当前是轻量级锁，获取重量级锁对象
       ObjectMonitor* monitor = new ObjectMonitor(object);
-      monitor->set_header(mark.set_unlocked());
+      monitor->set_header(mark.set_unlocked()); // 000...000 & 001 => 000...001
       bool own = locking_thread != nullptr && locking_thread->lock_stack().contains(object);
       if (own) {
         // Owned by locking_thread.
@@ -885,16 +885,16 @@ ObjectMonitor* LightweightSynchronizer::inflate_into_object_header(oop object, O
         monitor->set_anonymous_owner();
       }
       markWord monitor_mark = markWord::encode(monitor);
-      markWord old_mark = object->cas_set_mark(monitor_mark, mark);
+      markWord old_mark = object->cas_set_mark(monitor_mark, mark);// 设置新的对象头
       if (old_mark == mark) {
         // Success! Return inflated monitor.
         if (own) {
-          size_t removed = locking_thread->lock_stack().remove(object);
-          monitor->set_recursions(removed - 1);
+          size_t removed = locking_thread->lock_stack().remove(object);// 膨胀后移除栈内的对象，返回移除数量
+          monitor->set_recursions(removed - 1);// 在 monitor 中设置重入的次数
         }
         // Once the ObjectMonitor is configured and object is associated
         // with the ObjectMonitor, it is safe to allow async deflation:
-        ObjectSynchronizer::_in_use_list.add(monitor);
+        ObjectSynchronizer::_in_use_list.add(monitor); // 添加锁对象到同步器中
 
         log_inflate(current, object, cause);
         if (event.should_commit()) {
@@ -941,7 +941,7 @@ ObjectMonitor* LightweightSynchronizer::inflate_into_object_header(oop object, O
     return m;
   }
 }
-
+// 执行轻量级锁锁定
 ObjectMonitor* LightweightSynchronizer::inflate_fast_locked_object(oop object, ObjectSynchronizer::InflateCause cause, JavaThread* locking_thread, JavaThread* current) {
   assert(LockingMode == LM_LIGHTWEIGHT, "only used for lightweight");
   VerifyThreadState vts(locking_thread, current);
@@ -1007,15 +1007,15 @@ ObjectMonitor* LightweightSynchronizer::inflate_and_enter(oop object, BasicLock*
   // enters the lock on behalf of the 'locking_thread' thread.
 
   ObjectMonitor* monitor = nullptr;
-
-  if (!UseObjectMonitorTable) {
+  // 用 -XX:+UseObjectMonitorTable 开启 ObjectMonitor 表, 减少内存占用
+  if (!UseObjectMonitorTable) {// 不使用对象监视表
     // Do the old inflate and enter.
     monitor = inflate_into_object_header(object, cause, locking_thread, current);
 
     bool entered;
-    if (locking_thread == current) {
+    if (locking_thread == current) {// 如果是当前线程
       entered = monitor->enter(locking_thread);
-    } else {
+    } else {// 不是当前线程
       entered = monitor->enter_for(locking_thread);
     }
 

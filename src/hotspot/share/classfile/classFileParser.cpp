@@ -4362,7 +4362,7 @@ void ClassFileParser::verify_legal_field_modifiers(jint flags,
   const bool is_private   = (flags & JVM_ACC_PRIVATE)   != 0;
   const bool is_static    = (flags & JVM_ACC_STATIC)    != 0;
   const bool is_final     = (flags & JVM_ACC_FINAL)     != 0;
-  const bool is_volatile  = (flags & JVM_ACC_VOLATILE)  != 0;
+  const bool is_volatile  = (flags & JVM_ACC_VOLATILE)  != 0; // 检查字段是否是 volatile 类型的
   const bool is_transient = (flags & JVM_ACC_TRANSIENT) != 0;
   const bool is_enum      = (flags & JVM_ACC_ENUM)      != 0;
   const bool major_gte_1_5 = _major_version >= JAVA_1_5_VERSION;

@@ -1937,7 +1937,7 @@ char* SharedRuntime::generate_class_cast_message(
 JRT_LEAF(void, SharedRuntime::reguard_yellow_pages())
   (void) JavaThread::current()->stack_overflow_state()->reguard_stack();
 JRT_END
-
+// synchronized 同步块进入
 void SharedRuntime::monitor_enter_helper(oopDesc* obj, BasicLock* lock, JavaThread* current) {
   if (!SafepointSynchronize::is_synchronizing()) {
     // Only try quick_enter() if we're not trying to reach a safepoint

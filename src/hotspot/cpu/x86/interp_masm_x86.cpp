@@ -1024,7 +1024,7 @@ void InterpreterMacroAssembler::get_method_counters(Register method,
 void InterpreterMacroAssembler::lock_object(Register lock_reg) {
   assert(lock_reg == c_rarg1, "The argument is only for looks. It must be c_rarg1");
 
-  if (LockingMode == LM_MONITOR) {
+  if (LockingMode == LM_MONITOR) { // 如果是重量级锁，直接调用代码
     call_VM_preemptable(noreg,
             CAST_FROM_FN_PTR(address, InterpreterRuntime::monitorenter),
             lock_reg);
@@ -1044,7 +1044,7 @@ void InterpreterMacroAssembler::lock_object(Register lock_reg) {
     // Load object pointer into obj_reg
     movptr(obj_reg, Address(lock_reg, obj_offset));
 
-    if (LockingMode == LM_LIGHTWEIGHT) {
+    if (LockingMode == LM_LIGHTWEIGHT) { // 如果轻量级锁
       lightweight_lock(lock_reg, obj_reg, swap_reg, tmp_reg, slow_case);
     } else if (LockingMode == LM_LEGACY) {
       if (DiagnoseSyncOnValueBasedClasses != 0) {

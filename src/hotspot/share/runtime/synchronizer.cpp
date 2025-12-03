@@ -719,7 +719,7 @@ ObjectLocker::ObjectLocker(Handle obj, JavaThread* thread) : _npm(thread) {
   _obj = obj;
 
   if (_obj() != nullptr) {
-    ObjectSynchronizer::enter(_obj, &_lock, _thread);
+    ObjectSynchronizer::enter(_obj, &_lock, _thread);// 同步块进入代码块
   }
 }
 
@@ -927,24 +927,24 @@ static markWord read_stable_mark(oop obj) {
 
 static intptr_t get_next_hash(Thread* current, oop obj) {
   intptr_t value = 0;
-  if (hashCode == 0) {
+  if (hashCode == 0) { // 随机获取 hashCode
     // This form uses global Park-Miller RNG.
     // On MP system we'll have lots of RW access to a global, so the
     // mechanism induces lots of coherency traffic.
     value = os::random();
-  } else if (hashCode == 1) {
+  } else if (hashCode == 1) { // 基于对象地址和STW随机数
     // This variation has the property of being stable (idempotent)
     // between STW operations.  This can be useful in some of the 1-0
     // synchronization schemes.
     intptr_t addr_bits = cast_from_oop<intptr_t>(obj) >> 3;
     value = addr_bits ^ (addr_bits >> 5) ^ GVars.stw_random;
-  } else if (hashCode == 2) {
+  } else if (hashCode == 2) { // 测试使用
     value = 1;            // for sensitivity testing
-  } else if (hashCode == 3) {
+  } else if (hashCode == 3) { // 序列号；使用一个全局序列号，每个对象分配一个递增的整数作为哈希值。注意，这个序列号是全局的，可能成为多线程竞争的瓶颈。
     value = ++GVars.hc_sequence;
-  } else if (hashCode == 4) {
+  } else if (hashCode == 4) { // 对象地址作为哈希值
     value = cast_from_oop<intptr_t>(obj);
-  } else {
+  } else {  // xor-shift算法 默认策略；使用线程局部的状态（四个32位整数）来生成哈希值，避免了全局竞争，性能较好。代码注释指出，这可能是最好的实现，未来可能作为默认策略。
     // Marsaglia's xor-shift scheme with thread-specific state
     // This is probably the best overall implementation -- we'll
     // likely make this the default in future releases.

@@ -1906,7 +1906,7 @@ run:
           // Now store the result
           //
           int field_offset = entry->field_offset();
-          if (entry->is_volatile()) {
+          if (entry->is_volatile()) { // 如果字段是 volatile
             switch (tos_type) {
               case ztos:
                 obj->release_byte_field_put(field_offset, (STACK_INT(-1) & 1)); // only store LSB
@@ -1941,7 +1941,7 @@ run:
               default:
                 ShouldNotReachHere();
             }
-            OrderAccess::storeload();
+            OrderAccess::storeload(); // 执行 storeload 屏障
           } else {
             switch (tos_type) {
               case ztos:

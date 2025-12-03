@@ -75,11 +75,11 @@ class ObjectSynchronizer : AllStatic {
 
  public:
   typedef enum {
-    inflate_cause_vm_internal = 0,
-    inflate_cause_monitor_enter = 1,
-    inflate_cause_wait = 2,
-    inflate_cause_notify = 3,
-    inflate_cause_hash_code = 4,
+    inflate_cause_vm_internal = 0, // 虚拟机内部导致
+    inflate_cause_monitor_enter = 1, // 进入同步块进入同步锁
+    inflate_cause_wait = 2, // 线程等待进入同步锁
+    inflate_cause_notify = 3, // 线程通信进入同步锁
+    inflate_cause_hash_code = 4,// 获取hashCode 进入同步锁
     inflate_cause_jni_enter = 5,
     inflate_cause_jni_exit = 6,
     inflate_cause_nof = 7 // Number of causes

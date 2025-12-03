@@ -41,10 +41,10 @@ static inline void compiler_barrier() {
 
 // Implementation of class OrderAccess.
 
-inline void OrderAccess::loadload()   { compiler_barrier(); }
-inline void OrderAccess::storestore() { compiler_barrier(); }
-inline void OrderAccess::loadstore()  { compiler_barrier(); }
-inline void OrderAccess::storeload()  { fence();            }
+inline void OrderAccess::loadload()   { compiler_barrier(); } // x86中没有 invalidate queue
+inline void OrderAccess::storestore() { compiler_barrier(); } // x86中规定，所有的写操作，都必须进入store buffer；compiler_barrier 同样可以阻止 指令重排序
+inline void OrderAccess::loadstore()  { compiler_barrier(); } // compiler_barrier 同样可以阻止重排序（编译重排序）
+inline void OrderAccess::storeload()  { fence();            } // 写读屏障： x86只有 storeload 屏障
 
 inline void OrderAccess::acquire()    { compiler_barrier(); }
 inline void OrderAccess::release()    { compiler_barrier(); }
@@ -52,9 +52,9 @@ inline void OrderAccess::release()    { compiler_barrier(); }
 inline void OrderAccess::fence() {
   // always use locked addl since mfence is sometimes expensive
 #ifdef AMD64
-  __asm__ volatile ("lock; addl $0,0(%%rsp)" : : : "cc", "memory");
+  __asm__ volatile ("lock; addl $0,0(%%rsp)" : : : "cc", "memory");  // __asm__: 内嵌汇编； volatile：描述的指令编译器不能有话
 #else
-  __asm__ volatile ("lock; addl $0,0(%%esp)" : : : "cc", "memory");
+  __asm__ volatile ("lock; addl $0,0(%%esp)" : : : "cc", "memory");// 添加 lock 前缀，执行缓存行锁，活着Split 为总线锁
 #endif
   compiler_barrier();
 }

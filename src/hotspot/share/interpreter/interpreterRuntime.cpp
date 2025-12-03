@@ -722,14 +722,14 @@ void InterpreterRuntime::resolve_get_put(Bytecodes::Code bytecode, int field_ind
 //%note synchronization_3
 
 //%note monitor_1
-JRT_ENTRY_NO_ASYNC(void, InterpreterRuntime::monitorenter(JavaThread* current, BasicObjectLock* elem))
+JRT_ENTRY_NO_ASYNC(void, InterpreterRuntime::monitorenter(JavaThread* current, BasicObjectLock* elem))// 获取锁
 #ifdef ASSERT
   current->last_frame().interpreter_frame_verify_monitor(elem);
 #endif
   Handle h_obj(current, elem->obj());
   assert(Universe::heap()->is_in_or_null(h_obj()),
          "must be null or an object");
-  ObjectSynchronizer::enter(h_obj, elem->lock(), current);
+  ObjectSynchronizer::enter(h_obj, elem->lock(), current);// 进入同步器
   assert(Universe::heap()->is_in_or_null(elem->obj()),
          "must be null or an object");
 #ifdef ASSERT

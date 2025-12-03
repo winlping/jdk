@@ -206,24 +206,24 @@ class markWord {
     assert(has_locker(), "check");
     return (BasicLock*) value();
   }
-
+  // 是否是轻量级锁状态
   bool is_fast_locked() const {
     assert(LockingMode == LM_LIGHTWEIGHT, "should only be called with new lightweight locking");
-    return (value() & lock_mask_in_place) == locked_value;
+    return (value() & lock_mask_in_place) == locked_value; // value & 00...000 011 == 000
   }
   markWord set_fast_locked() const {
     // Clear the lock_mask_in_place bits to set locked_value:
-    return markWord(value() & ~lock_mask_in_place);
+    return markWord(value() & ~lock_mask_in_place);// 设置为轻量级锁 value & ~(000 ... 011) => value & 111 ... 100)
   }
-
+  // 判断是否已经是重量级锁
   bool has_monitor() const {
-    return ((value() & lock_mask_in_place) == monitor_value);
+    return ((value() & lock_mask_in_place) == monitor_value);// value & 00...000 011 == 000 010
   }
-  ObjectMonitor* monitor() const {
+  ObjectMonitor* monitor() const {// 取monitor地址
     assert(has_monitor(), "check");
     assert(!UseObjectMonitorTable, "Lightweight locking with OM table does not use markWord for monitors");
     // Use xor instead of &~ to provide one extra tag-bit check.
-    return (ObjectMonitor*) (value() ^ monitor_value);
+    return (ObjectMonitor*) (value() ^ monitor_value); // value ^ 000...010
   }
   bool has_displaced_mark_helper() const {
     intptr_t lockbits = value() & lock_mask_in_place;

@@ -173,11 +173,11 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   DEFINE_PAD_MINUS_SIZE(0, OM_CACHE_LINE_SIZE, sizeof(_metadata) +
                         sizeof(WeakHandle));
 
-  static const int64_t NO_OWNER = 0;
-  static const int64_t ANONYMOUS_OWNER = 1;
-  static const int64_t DEFLATER_MARKER = 2;
+  static const int64_t NO_OWNER = 0; // 00 处于空闲状态，没有线程持有他
+  static const int64_t ANONYMOUS_OWNER = 1; // 01 已经膨胀，但是属于匿名状态，没有线程持有他，发生在膨胀的过程中
+  static const int64_t DEFLATER_MARKER = 2; // 10 表示该ObjectMonitor正在被收缩（deflation）过程中使用。收缩是指当重量级锁不再需要时，JVM会尝试将ObjectMonitor从对象中移除（即收缩锁），使对象回到轻量级锁或无锁状态；在收缩过程中，_owner字段会被设置为DEFLATER_MARKER，以指示当前正在收缩，防止其他线程同时进行收缩操作或误用该ObjectMonitor
 
-  int64_t volatile _owner;  // Either owner_id of owner, NO_OWNER, ANONYMOUS_OWNER or DEFLATER_MARKER.
+  int64_t volatile _owner;  // Either owner_id of owner, NO_OWNER, ANONYMOUS_OWNER or DEFLATER_MARKER. 标识拥有这把锁的线程
   volatile uint64_t _previous_owner_tid;  // thread id of the previous owner of the monitor
   // Separate _owner and _next_om on different cache lines since
   // both can have busy multi-threaded access. _previous_owner_tid is only
@@ -185,23 +185,23 @@ class ObjectMonitor : public CHeapObj<mtObjectMonitor> {
   // cache line with _owner.
   DEFINE_PAD_MINUS_SIZE(1, OM_CACHE_LINE_SIZE, sizeof(void* volatile) +
                         sizeof(volatile uint64_t));
-  ObjectMonitor* _next_om;          // Next ObjectMonitor* linkage
-  volatile intx _recursions;        // recursion count, 0 for first entry
-  ObjectWaiter* volatile _entry_list;  // Threads blocked on entry or reentry.
+  ObjectMonitor* _next_om;          // Next ObjectMonitor* linkage 下一个锁对象链表
+  volatile intx _recursions;        // recursion count, 0 for first entry 锁重入次数
+  ObjectWaiter* volatile _entry_list;  // Threads blocked on entry or reentry. 阻塞在锁上的对象链表，链表的头节点
                                        // The list is actually composed of wait-nodes,
                                        // acting as proxies for Threads.
-  ObjectWaiter* volatile _entry_list_tail; // _entry_list is the head, this is the tail.
-  int64_t volatile _succ;           // Heir presumptive thread - used for futile wakeup throttling
+  ObjectWaiter* volatile _entry_list_tail; // _entry_list is the head, this is the tail. 链表的尾节点
+  int64_t volatile _succ;           // Heir presumptive thread - used for futile wakeup throttling 锁释放后唤醒线程的性能优化，通常是下一个线程
 
   volatile int _SpinDuration;
 
-  int _contentions;                 // Number of active contentions in enter(). It is used by is_busy()
+  int _contentions;                 // Number of active contentions in enter(). It is used by is_busy() 异步收缩重量级锁
                                     // along with other fields to determine if an ObjectMonitor can be
                                     // deflated. It is also used by the async deflation protocol. See
                                     // ObjectMonitor::deflate_monitor().
 
-  ObjectWaiter* volatile _wait_set; // LL of threads waiting on the monitor - wait()
-  volatile int  _waiters;           // number of waiting threads
+  ObjectWaiter* volatile _wait_set; // LL of threads waiting on the monitor - wait() 执行该方法后进入这个队列
+  volatile int  _waiters;           // number of waiting threads 阻塞的线程数
   volatile int _wait_set_lock;      // protects wait set queue - simple spinlock
 
   // Used in LM_LEGACY mode to store BasicLock* in case of inflation by contending thread.

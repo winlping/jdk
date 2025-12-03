@@ -42,11 +42,11 @@ inline ObjectMonitor* ObjectSynchronizer::read_monitor(Thread* current, oop obj,
   }
 }
 
-inline void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current) {
+inline void ObjectSynchronizer::enter(Handle obj, BasicLock* lock, JavaThread* current) {// 对象同步器
   assert(current == Thread::current(), "must be");
-
+  // 通过 -XX:LockingMode=2 来调整策略，默认是轻量级-2，0和1都是重量级锁
   if (LockingMode == LM_LIGHTWEIGHT) {
-    LightweightSynchronizer::enter(obj, lock, current);
+    LightweightSynchronizer::enter(obj, lock, current);// 进入轻量级锁
   } else {
     enter_legacy(obj, lock, current);
   }

@@ -772,7 +772,7 @@ JRT_ENTRY(void, Runtime1::throw_incompatible_class_change_error(JavaThread* curr
   SharedRuntime::throw_and_post_jvmti_exception(current, vmSymbols::java_lang_IncompatibleClassChangeError());
 JRT_END
 
-
+// 运行时执行进入 synchronized 块
 JRT_BLOCK_ENTRY(void, Runtime1::monitorenter(JavaThread* current, oopDesc* obj, BasicObjectLock* lock))
 #ifndef PRODUCT
   if (PrintC1Statistics) {

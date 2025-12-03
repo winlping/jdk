@@ -1001,11 +1001,11 @@ enum JavaThreadState {
 };
 
 enum LockingMode {
-  // Use only heavy monitors for locking
+  // Use only heavy monitors for locking  重量级锁模式
   LM_MONITOR     = 0,
-  // Legacy stack-locking, with monitors as 2nd tier
+  // Legacy stack-locking, with monitors as 2nd tier // 传统的轻量级锁优化，包括递归锁检查
   LM_LEGACY      = 1,
-  // New lightweight locking, with monitors as 2nd tier
+  // New lightweight locking, with monitors as 2nd tier // 轻量级锁
   LM_LIGHTWEIGHT = 2
 };
 

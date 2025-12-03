@@ -346,7 +346,7 @@ DEFINE_GETSETOOP_VOLATILE(jdouble, Double);
 #undef DEFINE_GETSETOOP_VOLATILE
 
 UNSAFE_LEAF(void, Unsafe_FullFence(JNIEnv *env, jobject unsafe)) {
-  OrderAccess::fence();
+  OrderAccess::fence(); // 全屏障
 } UNSAFE_END
 
 ////// Allocation requests

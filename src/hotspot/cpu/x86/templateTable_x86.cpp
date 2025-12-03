@@ -3830,8 +3830,8 @@ void TemplateTable::monitorenter() {
   transition(atos, vtos);
 
   // check for null object
-  __ null_check(rax);
-
+  __ null_check(rax); // 检查控对象，如果为空则抛出 NullPointerException
+  // 获取当前栈帧中监视器块的边界地址；监视器块存储在栈帧中，用于管理同步块信息
   const Address monitor_block_top(
         rbp, frame::interpreter_frame_monitor_block_top_offset * wordSize);
   const Address monitor_block_bot(
@@ -3840,37 +3840,37 @@ void TemplateTable::monitorenter() {
 
   Label allocated;
 
-  Register rtop = c_rarg3;
-  Register rbot = c_rarg2;
-  Register rmon = c_rarg1;
+  Register rtop = c_rarg3; // 指向 Monitor块的顶部
+  Register rbot = c_rarg2; // 指向 Monitor块的底部
+  Register rmon = c_rarg1; // 用于记录找到的Monitor块地址
 
-  // initialize entry pointer
+  // initialize entry pointer 初始化为 null，表示尚未找到
   __ xorl(rmon, rmon); // points to free slot or null
 
   // find a free slot in the monitor block (result in rmon)
   {
     Label entry, loop, exit;
-    __ movptr(rtop, monitor_block_top); // derelativize pointer
-    __ lea(rtop, Address(rbp, rtop, Address::times_ptr));
+    __ movptr(rtop, monitor_block_top); // derelativize pointer 获取Monitor块顶部地址
+    __ lea(rtop, Address(rbp, rtop, Address::times_ptr)); // 计算绝对地址
     // rtop points to current entry, starting with top-most entry
 
-    __ lea(rbot, monitor_block_bot);    // points to word before bottom
+    __ lea(rbot, monitor_block_bot);    // points to word before bottom 获取Monitor块底部地址（相对地址）
                                         // of monitor block
     __ jmpb(entry);
 
     __ bind(loop);
-    // check if current entry is used
+    // check if current entry is used  检查当前Monitor块是否空闲（obj字段是否为null）
     __ cmpptr(Address(rtop, BasicObjectLock::obj_offset()), NULL_WORD);
-    // if not used then remember entry in rmon
+    // if not used then remember entry in rmon 如果空闲，则记录该地址到rmon
     __ cmovptr(Assembler::equal, rmon, rtop);   // cmov => cmovptr
-    // check if current entry is for same object
+    // check if current entry is for same object 检查当前Monitor块是否已经指向当前对象
     __ cmpptr(rax, Address(rtop, BasicObjectLock::obj_offset()));
-    // if same object then stop searching
+    // if same object then stop searching 如果是当前对象，则直接退出循环（说明是重入）
     __ jccb(Assembler::equal, exit);
-    // otherwise advance to next entry
+    // otherwise advance to next entry 否则，移动到下一个Monitor块
     __ addptr(rtop, entry_size);
     __ bind(entry);
-    // check if bottom reached
+    // check if bottom reached 检查是否到达底部
     __ cmpptr(rtop, rbot);
     // if not at bottom then check this entry
     __ jcc(Assembler::notEqual, loop);
@@ -3884,7 +3884,7 @@ void TemplateTable::monitorenter() {
   {
     Label entry, loop;
     // 1. compute new pointers          // rsp: old expression stack top
-    __ movptr(rmon, monitor_block_bot); // rmon: old expression stack bottom
+    __ movptr(rmon, monitor_block_bot); // rmon: old expression stack bottom 优先查找已分配给当前对象的槽 （支持锁重入）
     __ lea(rmon, Address(rbp, rmon, Address::times_ptr));
     __ subptr(rsp, entry_size);         // move expression stack top
     __ subptr(rmon, entry_size);        // move expression stack bottom
@@ -3915,7 +3915,7 @@ void TemplateTable::monitorenter() {
 
   // store object
   __ movptr(Address(rmon, BasicObjectLock::obj_offset()), rax);
-  __ lock_object(rmon);
+  __ lock_object(rmon); // 实际的锁获取逻辑
 
   // check to make sure this monitor doesn't cause stack overflow after locking
   __ save_bcp();  // in case of exception

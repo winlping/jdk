@@ -272,7 +272,7 @@ address TemplateInterpreterGenerator::generate_error_exit(const char* msg) {
 
 
 //------------------------------------------------------------------------------------------------------------------------
-
+// 设置字节码入口
 void TemplateInterpreterGenerator::set_entry_points_for_all_bytes() {
   for (int i = 0; i < DispatchTable::length; i++) {
     Bytecodes::Code code = (Bytecodes::Code)i;

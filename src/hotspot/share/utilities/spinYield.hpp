@@ -61,9 +61,9 @@ public:
     // not saturated, or (2) sleeping if yielding is ineffective.
     if (_spins < _spin_limit) {
       ++_spins;
-      SpinPause();
+      SpinPause();// 自旋等待，不让出CPU ; 在x86架构上通常对应PAUSE指令 pause; 作用： 1. 提示CPU这是自旋循环，优化功耗；2. 避免内存顺序冲突; 3. 减少流水线清空
     } else {
-      yield_or_sleep();
+      yield_or_sleep(); // 让出CPU，等待耗时较长的
     }
   }
 

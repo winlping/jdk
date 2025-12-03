@@ -138,7 +138,7 @@ inline bool LockStack::try_recursive_enter(oop o) {
     return false;
   }
 
-  _base[end] = o;
+  _base[end] = o;// 登记在栈中的数组中，表示获取到了轻量级锁
   _top += oopSize;
   verify("post-try_recursive_enter");
   return true;

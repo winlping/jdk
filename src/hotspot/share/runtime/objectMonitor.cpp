@@ -286,7 +286,7 @@ static void check_object_context() {
 ObjectMonitor::ObjectMonitor(oop object) :
   _metadata(0),
   _object(_oop_storage, object),
-  _owner(NO_OWNER),
+  _owner(NO_OWNER), // 初始化时，默认没有拥有者
   _previous_owner_tid(0),
   _next_om(nullptr),
   _recursions(0),
@@ -435,7 +435,7 @@ bool ObjectMonitor::enter_for(JavaThread* locking_thread) {
 
 bool ObjectMonitor::try_enter(JavaThread* current, bool check_for_recursion) {
   // TryLock avoids the CAS and handles deflation.
-  TryLockResult r = try_lock(current);
+  TryLockResult r = try_lock(current);// 尝试获取锁
   if (r == TryLockResult::Success) {
     assert(_recursions == 0, "invariant");
     return true;
@@ -447,7 +447,7 @@ bool ObjectMonitor::try_enter(JavaThread* current, bool check_for_recursion) {
     return false;
   }
 
-  if (r == TryLockResult::HasOwner && has_owner(current)) {
+  if (r == TryLockResult::HasOwner && has_owner(current)) { // 如果是当前锁，则重入计数增加，返回获取锁成功
     _recursions++;
     return true;
   }
@@ -483,7 +483,7 @@ bool ObjectMonitor::spin_enter(JavaThread* current) {
   return false;
 }
 
-bool ObjectMonitor::enter(JavaThread* current) {
+bool ObjectMonitor::enter(JavaThread* current) {// 重量级锁入口
   assert(current == JavaThread::current(), "must be");
 
   if (spin_enter(current)) {
@@ -548,7 +548,7 @@ void ObjectMonitor::enter_with_contention_mark(JavaThread* current, ObjectMonito
   bool is_virtual = ce != nullptr && ce->is_virtual_thread();
   if (is_virtual) {
     notify_contended_enter(current);
-    result = Continuation::try_preempt(current, ce->cont_oop(current));
+    result = Continuation::try_preempt(current, ce->cont_oop(current));// 尝试中断当前执行的虚拟线程，使其暂停并且保存当前状态，然后将控制权交给调度器
     if (result == freeze_ok) {
       bool acquired = vthread_monitor_enter(current);
       if (acquired) {
@@ -1006,14 +1006,14 @@ void ObjectMonitor::enter_internal(JavaThread* current) {
 
     // park self
     if (do_timed_parked) {
-      current->_ParkEvent->park((jlong) recheck_interval);
+      current->_ParkEvent->park((jlong) recheck_interval);// 时间限制的等待
       // Increase the recheck_interval, but clamp the value.
-      recheck_interval *= 8;
+      recheck_interval *= 8;// 以8的倍数增加等待时间
       if (recheck_interval > MAX_RECHECK_INTERVAL) {
         recheck_interval = MAX_RECHECK_INTERVAL;
       }
     } else {
-      current->_ParkEvent->park();
+      current->_ParkEvent->park(); // 等待
     }
 
     if (try_lock(current) == TryLockResult::Success) {
@@ -1472,7 +1472,7 @@ void ObjectMonitor::unlink_after_acquire(JavaThread* current, ObjectWaiter* curr
 // of such futile wakups is low.
 
 void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
-  if (!has_owner(current)) {
+  if (!has_owner(current)) {// 只能退出自己拥有的锁
     // Apparent unbalanced locking ...
     // Naively we'd like to throw IllegalMonitorStateException.
     // As a practical matter we can neither allocate nor throw an
@@ -1493,7 +1493,7 @@ void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
     return;
   }
 
-  if (_recursions != 0) {
+  if (_recursions != 0) {// 重入锁的推出，重入次数减1
     _recursions--;        // this is simple recursive enter
     return;
   }
@@ -1510,7 +1510,7 @@ void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
     // If there is a successor we should release the lock as soon as
     // possible, so that the successor can acquire the lock. If there is
     // no successor, we might need to wake up a waiting thread.
-    if (!has_successor()) {
+    if (!has_successor()) {// 没有拥有者则队列尾部获取
       ObjectWaiter* w = Atomic::load(&_entry_list);
       if (w != nullptr) {
         // Other threads are blocked trying to acquire the lock and
@@ -1518,7 +1518,7 @@ void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
         // presumptive (successor) must be made ready. Since threads
         // are woken up in FIFO order, we need to find the tail of the
         // entry_list.
-        w = entry_list_tail(current);
+        w = entry_list_tail(current); // 取链表尾节点
         // I'd like to write: guarantee (w->_thread != current).
         // But in practice an exiting thread may find itself on the entry_list.
         // Let's say thread T1 calls O.wait().  Wait() enqueues T1 on O's waitset and
@@ -1542,8 +1542,8 @@ void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
     // Uses a storeload to separate release_store(owner) from the
     // successor check. The try_set_owner_from() below uses cmpxchg() so
     // we get the fence down there.
-    release_clear_owner(current);
-    OrderAccess::storeload();
+    release_clear_owner(current);// 清理锁对象头部信息
+    OrderAccess::storeload();// 设置屏障刷新缓存
 
     // Normally the exiting thread is responsible for ensuring succession,
     // but if this thread observes other successors are ready or other
@@ -1570,7 +1570,7 @@ void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
     // the lock.  Note that the dropped lock needs to become visible to the
     // spinner.
 
-    if (_entry_list == nullptr || has_successor()) {
+    if (_entry_list == nullptr || has_successor()) {// 链表为空则推出，表示释放锁；链表不为空，并且有后继线程也退出；链表不为空并且没有后继线程需要再次循环
       return;
     }
 
@@ -1579,7 +1579,7 @@ void ObjectMonitor::exit(JavaThread* current, bool not_suspended) {
     // to reacquire the lock. If we fail to reacquire the lock the
     // responsibility for ensuring succession falls to the new owner.
 
-    if (try_lock(current) != TryLockResult::Success) {
+    if (try_lock(current) != TryLockResult::Success) {// 如果获取锁失败，表示已经被其他线程持有了这个锁
       // Some other thread acquired the lock (or the monitor was
       // deflated). Either way we are done.
       return;
@@ -1619,17 +1619,17 @@ void ObjectMonitor::exit_epilog(JavaThread* current, ObjectWaiter* Wakee) {
 
   // Drop the lock.
   // Uses a fence to separate release_store(owner) from the LD in unpark().
-  release_clear_owner(current);
-  OrderAccess::fence();
+  release_clear_owner(current);// 设置锁对象为没有拥有者
+  OrderAccess::fence();// 刷新缓存
 
   DTRACE_MONITOR_PROBE(contended__exit, this, object(), current);
 
   if (vthread == nullptr) {
     // Platform thread case.
-    Trigger->unpark();
+    Trigger->unpark();// 唤醒平台线程
   } else if (java_lang_VirtualThread::set_onWaitingList(vthread, vthread_list_head())) {
     // Virtual thread case.
-    Trigger->unpark();
+    Trigger->unpark();// 唤醒虚拟线程
   }
 }
 
@@ -2344,7 +2344,7 @@ bool ObjectMonitor::try_spin(JavaThread* current) {
   // when preparing to LD...CAS _owner, etc and the CAS is likely
   // to succeed.
   if (!has_successor()) {
-    set_successor(current);
+    set_successor(current);// 设置后继线程，优化全量唤醒造成的资源浪费
   }
   int64_t prv = NO_OWNER;
 
@@ -2420,7 +2420,7 @@ bool ObjectMonitor::try_spin(JavaThread* current) {
     prv = ox;
 
     if (!has_successor()) {
-      set_successor(current);
+      set_successor(current); // 没有后继线程时设置后继线程
     }
   }
 
