@@ -625,19 +625,19 @@ JVM_ENTRY(jint, JVM_IHashCode(JNIEnv* env, jobject handle))
          checked_cast<jint>(ObjectSynchronizer::FastHashCode (THREAD, JNIHandles::resolve_non_null(handle)));
 JVM_END
 
-
+// Object.wait()
 JVM_ENTRY(void, JVM_MonitorWait(JNIEnv* env, jobject handle, jlong ms))
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
   ObjectSynchronizer::wait(obj, ms, CHECK);
 JVM_END
 
-
+// Object.notify()
 JVM_ENTRY(void, JVM_MonitorNotify(JNIEnv* env, jobject handle))
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
   ObjectSynchronizer::notify(obj, CHECK);
 JVM_END
 
-
+// Object.notifyAll()
 JVM_ENTRY(void, JVM_MonitorNotifyAll(JNIEnv* env, jobject handle))
   Handle obj(THREAD, JNIHandles::resolve_non_null(handle));
   ObjectSynchronizer::notifyall(obj, CHECK);
@@ -2889,10 +2889,10 @@ JVM_ENTRY(void, JVM_SleepNanos(JNIEnv* env, jclass threadClass, jlong nanos))
   HOTSPOT_THREAD_SLEEP_BEGIN(nanos / NANOSECS_PER_MILLISEC);
 
   if (nanos == 0) {
-    os::naked_yield();
+    os::naked_yield();// 让出CPU，但不保证睡眠
   } else {
-    ThreadState old_state = thread->osthread()->get_state();
-    thread->osthread()->set_state(SLEEPING);
+    ThreadState old_state = thread->osthread()->get_state(); // 保存状态
+    thread->osthread()->set_state(SLEEPING);// 设置状态为SLEEPING
     if (!thread->sleep_nanos(nanos)) { // interrupted
       // An asynchronous exception could have been thrown on
       // us while we were sleeping. We do not overwrite those.

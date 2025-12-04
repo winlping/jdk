@@ -748,7 +748,7 @@ public class ThreadLocal<T> {
         private void resize() {
             Entry[] oldTab = table;
             int oldLen = oldTab.length;
-            int newLen = oldLen * 2;
+            int newLen = oldLen * 2; // 扩展两倍的容量
             Entry[] newTab = new Entry[newLen];
             int count = 0;
 

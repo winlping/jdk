@@ -787,33 +787,33 @@ ObjectMonitor* LightweightSynchronizer::inflate_locked_or_imse(oop obj, ObjectSy
   for (;;) {
     markWord mark = obj->mark_acquire();
     if (mark.is_unlocked()) {
-      // No lock, IMSE.
+      // No lock, IMSE. 无锁状态执行wait 抛出异常
       THROW_MSG_(vmSymbols::java_lang_IllegalMonitorStateException(),
                  "current thread is not owner", nullptr);
     }
 
-    if (mark.is_fast_locked()) {
-      if (!current->lock_stack().contains(obj)) {
+    if (mark.is_fast_locked()) {// 轻量级锁
+      if (!current->lock_stack().contains(obj)) {// 当前线程不持有锁 抛出异常
         // Fast locked by other thread, IMSE.
         THROW_MSG_(vmSymbols::java_lang_IllegalMonitorStateException(),
                    "current thread is not owner", nullptr);
-      } else {
+      } else {// 轻量级锁膨胀
         // Current thread owns the lock, must inflate
         return inflate_fast_locked_object(obj, cause, current, current);
       }
     }
-
+    // 重量级锁
     assert(mark.has_monitor(), "must be");
     ObjectMonitor* monitor = ObjectSynchronizer::read_monitor(current, obj, mark);
     if (monitor != nullptr) {
-      if (monitor->has_anonymous_owner()) {
+      if (monitor->has_anonymous_owner()) {// 如果是匿名拥有者
         LockStack& lock_stack = current->lock_stack();
-        if (lock_stack.contains(obj)) {
+        if (lock_stack.contains(obj)) {// 必须线程栈必须包含对象
           // Current thread owns the lock but someone else inflated it.
           // Fix owner and pop lock stack.
-          monitor->set_owner_from_anonymous(current);
+          monitor->set_owner_from_anonymous(current);// 将 匿名修改为当前线程
           monitor->set_recursions(lock_stack.remove(obj) - 1);
-        } else {
+        } else {// 线程栈不包含对象时抛出异常
           // Fast locked (and inflated) by other thread, or deflation in progress, IMSE.
           THROW_MSG_(vmSymbols::java_lang_IllegalMonitorStateException(),
                      "current thread is not owner", nullptr);

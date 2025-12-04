@@ -1772,8 +1772,8 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
       JvmtiExport::post_monitor_wait(current, object(), millis);
     }
     current->set_current_waiting_monitor(this);
-    result = Continuation::try_preempt(current, ce->cont_oop(current));
-    if (result == freeze_ok) {
+    result = Continuation::try_preempt(current, ce->cont_oop(current));// 提交当前虚拟线程的资源给调度器
+    if (result == freeze_ok) {// 调度器回收资源后，当前虚拟线程执行等待
       vthread_wait(current, millis);
       current->set_current_waiting_monitor(nullptr);
       return;
@@ -1810,12 +1810,12 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
   // so we use a simple spin-lock instead of a heavier-weight blocking lock.
 
   Thread::SpinAcquire(&_wait_set_lock);
-  add_waiter(&node);
+  add_waiter(&node);// 添加到_wait_set_
   Thread::SpinRelease(&_wait_set_lock);
 
-  intx save = _recursions;     // record the old recursion count
-  _waiters++;                  // increment the number of waiters
-  _recursions = 0;             // set the recursion level to be 1
+  intx save = _recursions;     // record the old recursion count 保存重入次数
+  _waiters++;                  // increment the number of waiters 等待线程+1
+  _recursions = 0;             // set the recursion level to be 1 保存重入次数后归零
   exit(current);               // exit the monitor
   guarantee(!has_owner(current), "invariant");
 
@@ -1841,9 +1841,9 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
     {
       ClearSuccOnSuspend csos(this);
       ThreadBlockInVMPreprocess<ClearSuccOnSuspend> tbivs(current, csos, true /* allow_suspend */);
-      if (interrupted || HAS_PENDING_EXCEPTION) {
+      if (interrupted || HAS_PENDING_EXCEPTION) {// 如果当前平台线程被打断的话，不进行阻塞
         // Intentionally empty
-      } else if (!node._notified) {
+      } else if (!node._notified) {// 当前线程没有被通知的话，平台线程进行阻塞，如果存在时间就阻塞一定时间
         if (millis <= 0) {
           current->_ParkEvent->park();
         } else {
@@ -1925,12 +1925,12 @@ void ObjectMonitor::wait(jlong millis, bool interruptible, TRAPS) {
 
     assert(!has_owner(current), "invariant");
     ObjectWaiter::TStates v = node.TState;
-    if (v == ObjectWaiter::TS_RUN) {
+    if (v == ObjectWaiter::TS_RUN) { //
       // We use the NoPreemptMark for the very rare case where the previous
       // preempt attempt failed due to OOM. The preempt on monitor contention
       // could succeed but we can't unmount now.
       NoPreemptMark npm(current);
-      enter(current);
+      enter(current);// 竞争锁
     } else {
       guarantee(v == ObjectWaiter::TS_ENTER, "invariant");
       reenter_internal(current, &node);
@@ -2124,14 +2124,14 @@ void ObjectMonitor::vthread_wait(JavaThread* current, jlong millis) {
   // returns because of a timeout or interrupt.  Contention is exceptionally rare
   // so we use a simple spin-lock instead of a heavier-weight blocking lock.
 
-  Thread::SpinAcquire(&_wait_set_lock);
+  Thread::SpinAcquire(&_wait_set_lock);// 保护 wait_set的自旋锁
   add_waiter(node);
   Thread::SpinRelease(&_wait_set_lock);
 
   node->_recursions = _recursions;   // record the old recursion count
   _recursions = 0;                   // set the recursion level to be 0
   _waiters++;                        // increment the number of waiters
-  exit(current);                     // exit the monitor
+  exit(current);                     // exit the monitor 释放锁，虚拟线程的锁等待是在上层使用 Continuation 来保证的
   guarantee(!has_owner(current), "invariant");
 
   assert(java_lang_VirtualThread::state(vthread) == java_lang_VirtualThread::RUNNING, "wrong state for vthread");
@@ -2488,7 +2488,7 @@ void ObjectWaiter::wait_reenter_end(ObjectMonitor * const mon) {
   JavaThreadBlockedOnMonitorEnterState::wait_reenter_end(_thread, _active);
 }
 
-inline void ObjectMonitor::add_waiter(ObjectWaiter* node) {
+inline void ObjectMonitor::add_waiter(ObjectWaiter* node) {// 双向链表，并且首尾节点相互指向 tail.next = head; head.prev = tail;
   assert(node != nullptr, "should not add null node");
   assert(node->_prev == nullptr, "node already in list");
   assert(node->_next == nullptr, "node already in list");
@@ -2517,7 +2517,7 @@ inline ObjectWaiter* ObjectMonitor::dequeue_waiter() {
   return waiter;
 }
 
-inline void ObjectMonitor::dequeue_specific_waiter(ObjectWaiter* node) {
+inline void ObjectMonitor::dequeue_specific_waiter(ObjectWaiter* node) { // 等待的节点出堆
   assert(node != nullptr, "should not dequeue nullptr node");
   assert(node->_prev != nullptr, "node already removed from list");
   assert(node->_next != nullptr, "node already removed from list");
@@ -2525,16 +2525,16 @@ inline void ObjectMonitor::dequeue_specific_waiter(ObjectWaiter* node) {
   // timeout or other spurious wake-up, dequeue the
   // waiter from waiting list
   ObjectWaiter* next = node->_next;
-  if (next == node) {
+  if (next == node) {// 如果最后一个节点，那么清空 wait_set
     assert(node->_prev == node, "invariant check");
     _wait_set = nullptr;
   } else {
-    ObjectWaiter* prev = node->_prev;
+    ObjectWaiter* prev = node->_prev;// 移除节点
     assert(prev->_next == node, "invariant check");
     assert(next->_prev == node, "invariant check");
     next->_prev = prev;
     prev->_next = next;
-    if (_wait_set == node) {
+    if (_wait_set == node) {// 如果是头节点，则将头节点下移
       _wait_set = next;
     }
   }

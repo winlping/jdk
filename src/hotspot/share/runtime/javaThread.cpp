@@ -558,13 +558,13 @@ void JavaThread::interrupt() {
   WINDOWS_ONLY(osthread()->set_interrupted(true);)
 
   // For Thread.sleep
-  _SleepEvent->unpark();
+  _SleepEvent->unpark();// 对于使用 thread.sleep 进行唤醒
 
   // For JSR166 LockSupport.park
-  parker()->unpark();
+  parker()->unpark(); // 使用 LockSupport.park 睡眠的进行唤醒
 
   // For ObjectMonitor and JvmtiRawMonitor
-  _ParkEvent->unpark();
+  _ParkEvent->unpark(); // 使用 ObjectMonitor and JvmtiRawMonitor 睡眠的进行唤醒
 }
 
 bool JavaThread::is_interrupted(bool clear_interrupted) {
@@ -800,7 +800,7 @@ static void ensure_join(JavaThread* thread) {
   // requirements.
   assert(java_lang_Thread::thread(threadObj()) == thread, "must be alive");
   java_lang_Thread::release_set_thread(threadObj(), nullptr);
-  lock.notify_all(thread);
+  lock.notify_all(thread);// 通知在该线程对象上挂起的线程，如使用 synchronized(thread) 的线程对象和Thread.join的线程
   // Ignore pending exception, since we are exiting anyway
   thread->clear_pending_exception();
 }
@@ -905,7 +905,7 @@ void JavaThread::exit(bool destroy_vm, ExitType exit_type) {
   // Notify waiters on thread object. This has to be done after exit() is called
   // on the thread (if the thread is the last thread in a daemon ThreadGroup the
   // group should have the destroyed bit set before waiters are notified).
-  ensure_join(this);
+  ensure_join(this);// 线程执行结束后要通知 调用join 等待的线程
   assert(!this->has_pending_exception(), "ensure_join should have cleared");
 
   if (log_is_enabled(Debug, os, thread, timer)) {
@@ -2112,7 +2112,7 @@ bool JavaThread::sleep_nanos(jlong nanos) {
   // Thread interruption establishes a happens-before ordering in the
   // Java Memory Model, so we need to ensure we synchronize with the
   // interrupt state.
-  OrderAccess::fence();
+  OrderAccess::fence(); // 屏障
 
   jlong prevtime = os::javaTimeNanos();
 
