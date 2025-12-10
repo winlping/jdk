@@ -549,7 +549,7 @@ public class ThreadLocal<T> {
 
             tab[i] = new Entry(key, value);
             int sz = ++size;
-            if (!cleanSomeSlots(i, sz) && sz >= threshold)
+            if (!cleanSomeSlots(i, sz) && sz >= threshold)// 首次的threshold =10
                 rehash();
         }
 
@@ -767,7 +767,7 @@ public class ThreadLocal<T> {
                 }
             }
 
-            setThreshold(newLen);
+            setThreshold(newLen);// 设置新的阈值为2/3
             size = count;
             table = newTab;
         }
