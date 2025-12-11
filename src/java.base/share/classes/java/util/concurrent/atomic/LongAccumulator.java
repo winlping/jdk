@@ -92,7 +92,7 @@ public class LongAccumulator extends Striped64 implements Serializable {
      * Creates a new instance using the given accumulator function
      * and identity element.
      * @param accumulatorFunction a side-effect-free function of two arguments
-     * @param identity identity (initial value) for the accumulator function
+     * @param identity identity (initial value) for the accumulator function  初始值
      */
     public LongAccumulator(LongBinaryOperator accumulatorFunction,
                            long identity) {
@@ -107,18 +107,18 @@ public class LongAccumulator extends Striped64 implements Serializable {
      */
     public void accumulate(long x) {
         Cell[] cs; long b, v, r; int m; Cell c;
-        if ((cs = cells) != null
-            || ((r = function.applyAsLong(b = base, x)) != b
-                && !casBase(b, r))) {
+        if ((cs = cells) != null// cells 为空进入if， 初始时为空
+            || ((r = function.applyAsLong(b = base, x)) != b// 如果计算结果不与base相同，则执行后面的cas
+                && !casBase(b, r))) {// 如果CAS失败，则进入if
             int index = getProbe();
             boolean uncontended = true;
             if (cs == null
                 || (m = cs.length - 1) < 0
-                || (c = cs[index & m]) == null
+                || (c = cs[index & m]) == null // 前面三个条件，要么数组为空，要么长度为0，要么当前位置为空后就进入if
                 || !(uncontended =
-                     (r = function.applyAsLong(v = c.value, x)) == v
-                     || c.cas(v, r)))
-                longAccumulate(x, function, uncontended, index);
+                     (r = function.applyAsLong(v = c.value, x)) == v // 不为空则开始计算，与原来值不同就进行cas
+                     || c.cas(v, r))) // cas成功则不再进入if
+                longAccumulate(x, function, uncontended, index); // 没有成功设置值
         }
     }
 
@@ -133,7 +133,7 @@ public class LongAccumulator extends Striped64 implements Serializable {
      */
     public long get() {
         Cell[] cs = cells;
-        long result = base;
+        long result = base;// 在并发场景中每次计算的值都尽可能的合并在base中，只有没有累计到base 中的，通过Cell中的累积值，再计算值
         if (cs != null) {
             for (Cell c : cs)
                 if (c != null)

@@ -940,7 +940,7 @@ void os::_exit(int num) {
 }
 
 void os::naked_yield() {
-  sched_yield();
+  sched_yield(); // 调用操作系统调度器，让出CPU时间
 }
 
 // Sleep forever; naked call to OS-specific sleep; use with CAUTION

@@ -2846,7 +2846,7 @@ bool LibraryCallKit::inline_unsafe_fence(vmIntrinsics::ID id) {
       insert_mem_bar(Op_StoreStoreFence);
       return true;
     case vmIntrinsics::_fullFence:
-      insert_mem_bar(Op_MemBarVolatile);
+      insert_mem_bar(Op_MemBarVolatile); // 全屏障要加入lock 指令，通过内联
       return true;
     default:
       fatal_unexpected_iid(id);

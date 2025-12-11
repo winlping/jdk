@@ -56,7 +56,7 @@ public class AtomicStampedReference<V> {
 
     private static class Pair<T> {
         final T reference;
-        final int stamp;
+        final int stamp; // 使用版本来避免ABA问题
         private Pair(T reference, int stamp) {
             this.reference = reference;
             this.stamp = stamp;

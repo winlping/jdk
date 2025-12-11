@@ -227,10 +227,10 @@ abstract class Striped64 extends Number {
         for (boolean collide = false;;) {       // True if last slot nonempty
             Cell[] cs; Cell c; int n; long v;
             if ((cs = cells) != null && (n = cs.length) > 0) {
-                if ((c = cs[(n - 1) & index]) == null) {
+                if ((c = cs[(n - 1) & index]) == null) { // 当前位置为空才会放入新的节点
                     if (cellsBusy == 0) {       // Try to attach new Cell
                         Cell r = new Cell(x);   // Optimistically create
-                        if (cellsBusy == 0 && casCellsBusy()) {
+                        if (cellsBusy == 0 && casCellsBusy()) {// cas 来设置cells的节点
                             try {               // Recheck under lock
                                 Cell[] rs; int m, j;
                                 if ((rs = cells) != null &&
@@ -250,7 +250,7 @@ abstract class Striped64 extends Number {
                 else if (!wasUncontended)       // CAS already known to fail
                     wasUncontended = true;      // Continue after rehash
                 else if (c.cas(v = c.value,
-                               (fn == null) ? v + x : fn.applyAsLong(v, x)))
+                               (fn == null) ? v + x : fn.applyAsLong(v, x))) //每个槽位都尽可能手机计算后的值
                     break;
                 else if (n >= NCPU || cells != cs)
                     collide = false;            // At max size or stale
@@ -259,7 +259,7 @@ abstract class Striped64 extends Number {
                 else if (cellsBusy == 0 && casCellsBusy()) {
                     try {
                         if (cells == cs)        // Expand table unless stale
-                            cells = Arrays.copyOf(cs, n << 1);
+                            cells = Arrays.copyOf(cs, n << 1);// 
                     } finally {
                         cellsBusy = 0;
                     }
@@ -268,10 +268,10 @@ abstract class Striped64 extends Number {
                 }
                 index = advanceProbe(index);
             }
-            else if (cellsBusy == 0 && cells == cs && casCellsBusy()) {
+            else if (cellsBusy == 0 && cells == cs && casCellsBusy()) { // 初始设置cells
                 try {                           // Initialize table
                     if (cells == cs) {
-                        Cell[] rs = new Cell[2];
+                        Cell[] rs = new Cell[2];// 初始长度为2
                         rs[index & 1] = new Cell(x);
                         cells = rs;
                         break;
@@ -282,7 +282,7 @@ abstract class Striped64 extends Number {
             }
             // Fall back on using base
             else if (casBase(v = base,
-                             (fn == null) ? v + x : fn.applyAsLong(v, x)))
+                             (fn == null) ? v + x : fn.applyAsLong(v, x)))// 初始时会产生竞争，失败的线程会进入这里，计算base值
                 break;
         }
     }

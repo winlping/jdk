@@ -84,7 +84,7 @@ public abstract class AtomicIntegerFieldUpdater<T> {
      * access control
      */
     @CallerSensitive
-    public static <U> AtomicIntegerFieldUpdater<U> newUpdater(Class<U> tclass,
+    public static <U> AtomicIntegerFieldUpdater<U> newUpdater(Class<U> tclass, // 生成一个tclass类fieldName属性的替换器
                                                               String fieldName) {
         return new AtomicIntegerFieldUpdaterImpl<U>
             (tclass, fieldName, Reflection.getCallerClass());
@@ -388,9 +388,9 @@ public abstract class AtomicIntegerFieldUpdater<T> {
             final Field field;
             final int modifiers;
             try {
-                field = tclass.getDeclaredField(fieldName);
+                field = tclass.getDeclaredField(fieldName);// 获取属性的Field对象以便后面通过Unsafe获取偏移量
                 modifiers = field.getModifiers();
-                sun.reflect.misc.ReflectUtil.ensureMemberAccess(
+                sun.reflect.misc.ReflectUtil.ensureMemberAccess( // 仅支持 public 或 protected 类型
                     caller, tclass, null, modifiers);
             } catch (Exception ex) {
                 throw new RuntimeException(ex);
@@ -399,7 +399,7 @@ public abstract class AtomicIntegerFieldUpdater<T> {
             if (field.getType() != int.class)
                 throw new IllegalArgumentException("Must be integer type");
 
-            if (!Modifier.isVolatile(modifiers))
+            if (!Modifier.isVolatile(modifiers)) // 必须是volatile 类型
                 throw new IllegalArgumentException("Must be volatile type");
 
             // Access to protected field members is restricted to receivers only
@@ -425,7 +425,7 @@ public abstract class AtomicIntegerFieldUpdater<T> {
         private static boolean isAncestor(ClassLoader first, ClassLoader second) {
             ClassLoader acl = first;
             do {
-                acl = acl.getParent();
+                acl = acl.getParent(); // 判断第二个是否是第一个加载器的祖先
                 if (second == acl) {
                     return true;
                 }
@@ -438,7 +438,7 @@ public abstract class AtomicIntegerFieldUpdater<T> {
          * package qualifier
          */
         private static boolean isSamePackage(Class<?> class1, Class<?> class2) {
-            return class1.getClassLoader() == class2.getClassLoader()
+            return class1.getClassLoader() == class2.getClassLoader()// 同一个包应该满足类加载器相同，包名相同
                    && class1.getPackageName() == class2.getPackageName();
         }
 

@@ -5896,7 +5896,7 @@ instruct membar_release_lock()
   ins_encode();
   ins_pipe(empty);
 %}
-
+// 通过内联，插入指令
 instruct membar_volatile(rFlagsReg cr) %{
   match(MemBarVolatile);
   effect(KILL cr);

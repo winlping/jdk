@@ -54,7 +54,7 @@ public class AtomicBoolean implements java.io.Serializable {
     private static final long serialVersionUID = 4654671469794556979L;
     private static final VarHandle VALUE = MhUtil.findVarHandle(
             MethodHandles.lookup(), "value", int.class);
-
+    // MethodHandles.lookup() 返回调用这个方法的类所有权限的LookUp对象，此时是AtomicBoolean
     /** @serial */
     private volatile int value;
 

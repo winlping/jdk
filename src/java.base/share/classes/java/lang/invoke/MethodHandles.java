@@ -122,7 +122,7 @@ public final class MethodHandles {
     @CallerSensitive
     @ForceInline // to ensure Reflection.getCallerClass optimization
     public static Lookup lookup() {
-        final Class<?> c = Reflection.getCallerClass();
+        final Class<?> c = Reflection.getCallerClass();// 谁调用了当前方法 lookup
         if (c == null) {
             throw new IllegalCallerException("no caller frame");
         }

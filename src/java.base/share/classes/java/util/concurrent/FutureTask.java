@@ -92,13 +92,13 @@ public class FutureTask<V> implements RunnableFuture<V> {
      * NEW -> INTERRUPTING -> INTERRUPTED
      */
     private volatile int state;
-    private static final int NEW          = 0;
-    private static final int COMPLETING   = 1;
-    private static final int NORMAL       = 2;
-    private static final int EXCEPTIONAL  = 3;
-    private static final int CANCELLED    = 4;
-    private static final int INTERRUPTING = 5;
-    private static final int INTERRUPTED  = 6;
+    private static final int NEW          = 0; // 刚创建的状态
+    private static final int COMPLETING   = 1; // 正在处理中
+    private static final int NORMAL       = 2; // 正常完成
+    private static final int EXCEPTIONAL  = 3; // 处理异常
+    private static final int CANCELLED    = 4; // 取消
+    private static final int INTERRUPTING = 5; // 打断中
+    private static final int INTERRUPTED  = 6; // 被打断
 
     /** The underlying callable; nulled out after running */
     private Callable<V> callable;
@@ -117,9 +117,9 @@ public class FutureTask<V> implements RunnableFuture<V> {
     @SuppressWarnings("unchecked")
     private V report(int s) throws ExecutionException {
         Object x = outcome;
-        if (s == NORMAL)
+        if (s == NORMAL) // 执行完成后返回
             return (V)x;
-        if (s >= CANCELLED)
+        if (s >= CANCELLED)// 发生异常被取消
             throw new CancellationException();
         throw new ExecutionException((Throwable)x);
     }
@@ -159,22 +159,22 @@ public class FutureTask<V> implements RunnableFuture<V> {
         return state >= CANCELLED;
     }
 
-    public boolean isDone() {
+    public boolean isDone() { // 不能准确返回任务是否完成  COMPLETING 正在处理
         return state != NEW;
     }
-
+    // 取消方法
     public boolean cancel(boolean mayInterruptIfRunning) {
         if (!(state == NEW && STATE.compareAndSet
               (this, NEW, mayInterruptIfRunning ? INTERRUPTING : CANCELLED)))
-            return false;
+            return false;// 只有在初始状态NEW才能被打断，并且在锁竞争成功的前提下才能打断
         try {    // in case call to interrupt throws exception
-            if (mayInterruptIfRunning) {
+            if (mayInterruptIfRunning) {// 其他状态下，为true的话，进行打断
                 try {
                     Thread t = runner;
                     if (t != null)
                         t.interrupt();
                 } finally { // final state
-                    STATE.setRelease(this, INTERRUPTED);
+                    STATE.setRelease(this, INTERRUPTED);// 设置状态
                 }
             }
         } finally {
@@ -430,7 +430,7 @@ public class FutureTask<V> implements RunnableFuture<V> {
                     Thread t = q.thread;
                     if (t != null) {
                         q.thread = null;
-                        LockSupport.unpark(t);
+                        LockSupport.unpark(t);// 唤醒锁
                     }
                     WaitNode next = q.next;
                     if (next == null)
@@ -471,17 +471,17 @@ public class FutureTask<V> implements RunnableFuture<V> {
             if (s > COMPLETING) {
                 if (q != null)
                     q.thread = null;
-                return s;
+                return s;// 已经完成了，返回状态
             }
-            else if (s == COMPLETING)
+            else if (s == COMPLETING)// 正在处理中，等待 yield
                 // We may have already promised (via isDone) that we are done
                 // so never return empty-handed or throw InterruptedException
                 Thread.yield();
             else if (Thread.interrupted()) {
-                removeWaiter(q);
+                removeWaiter(q);// 已经被打断，移除当前等待者
                 throw new InterruptedException();
             }
-            else if (q == null) {
+            else if (q == null) { // 任务没有完成，并且没有打断，那么创建等待者，准备再一次循环检查后进入栈等待
                 if (timed && nanos <= 0L)
                     return s;
                 q = new WaitNode();
@@ -580,9 +580,9 @@ public class FutureTask<V> implements RunnableFuture<V> {
     }
 
     // VarHandle mechanics
-    private static final VarHandle STATE;
-    private static final VarHandle RUNNER;
-    private static final VarHandle WAITERS;
+    private static final VarHandle STATE; // 状态
+    private static final VarHandle RUNNER;// 运行的线程
+    private static final VarHandle WAITERS; // 存储等待者的栈
     static {
         MethodHandles.Lookup l = MethodHandles.lookup();
         STATE = MhUtil.findVarHandle(l, "state", int.class);

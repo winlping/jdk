@@ -469,7 +469,7 @@ import static java.lang.invoke.MethodHandleStatics.UNSAFE;
  * @see MethodHandle
  * @see MethodHandles
  * @see MethodType
- * @since 9
+ * @since 9 用于对变量进行低级别、高性能原子操作的类，它是Unsafe类的安全替代品, 其中的UNSAFE 也是使用的 Unsafe 类
  */
 public abstract sealed class VarHandle implements Constable
      permits IndirectVarHandle, LazyInitializingVarHandle, SegmentVarHandle,

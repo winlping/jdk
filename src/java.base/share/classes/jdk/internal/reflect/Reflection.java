@@ -71,7 +71,7 @@ public class Reflection {
         and its implementation. */
     @CallerSensitive
     @IntrinsicCandidate
-    public static native Class<?> getCallerClass();
+    public static native Class<?> getCallerClass(); // 调用这个方法的方法要使用 @CallerSensitive注释
 
     /** Retrieves the access flags written to the class file. For
         inner classes these flags may differ from those returned by

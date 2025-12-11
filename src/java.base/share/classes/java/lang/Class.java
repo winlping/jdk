@@ -782,7 +782,7 @@ public final class Class<T> implements java.io.Serializable,
      * @since     1.1
      */
     @IntrinsicCandidate
-    public native boolean isAssignableFrom(Class<?> cls);
+    public native boolean isAssignableFrom(Class<?> cls); // cls是否是当前类的子类
 
 
     /**

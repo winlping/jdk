@@ -48,15 +48,15 @@ import java.lang.invoke.VarHandle;
 public final class MhUtil {
 
     private MhUtil() {}
-
-    public static VarHandle findVarHandle(MethodHandles.Lookup lookup,
-                                          String name,
-                                          Class<?> type) {
+    
+    public static VarHandle findVarHandle(MethodHandles.Lookup lookup, // 包含被查找类所有权限的lookup
+                                          String name, // 查找的字段
+                                          Class<?> type) { // 查找字段的类型
         return findVarHandle(lookup, lookup.lookupClass(), name, type);
     }
 
     public static VarHandle findVarHandle(MethodHandles.Lookup lookup,
-                                          Class<?> recv,
+                                          Class<?> recv, // 查找字段所在的类
                                           String name,
                                           Class<?> type) {
         try {

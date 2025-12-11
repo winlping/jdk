@@ -250,16 +250,16 @@ public:
     *addr() = normalize_for_write(x);
   }
 
-
+  // MO_SEQ_CST的load操作通常会插入LoadLoad和LoadStore内存屏障
   T get_volatile() {
     GuardUnsafeAccess guard(_thread);
-    volatile T ret = RawAccess<MO_SEQ_CST>::load(addr());
+    volatile T ret = RawAccess<MO_SEQ_CST>::load(addr());// 模板参数，代表 Memory Order: Sequential Consistency。这是最严格的内存排序约束，它保证：程序顺序：在当前线程内，所有MO_SEQ_CST操作之间的顺序保持不变；全局单一顺序：系统中所有线程看到的所有MO_SEQ_CST操作有一个一致的全局顺序
     return normalize_for_read(ret);
   }
-
+  //
   void put_volatile(T x) {
     GuardUnsafeAccess guard(_thread);
-    RawAccess<MO_SEQ_CST>::store(addr(), normalize_for_write(x));
+    RawAccess<MO_SEQ_CST>::store(addr(), normalize_for_write(x)); //将经过规范化处理的值 normalize_for_write(x)原子地存储到 addr()指定的内存地址中
   }
 };
 

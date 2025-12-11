@@ -455,7 +455,7 @@ public class Thread implements Runnable {
      * concurrency control constructs such as the ones in the
      * {@link java.util.concurrent.locks} package.
      */
-    public static void yield() {
+    public static void yield() {// 让出CPU调度时间，底层调用操作系统方法 sched_yield()
         if (currentThread() instanceof VirtualThread vthread) {
             vthread.tryYield();
         } else {
@@ -1621,7 +1621,7 @@ public class Thread implements Runnable {
      *          {@code false} otherwise.
      * @see #isInterrupted()
      */
-    public static boolean interrupted() {
+    public static boolean interrupted() {// 返回线程的的打断状态，如果是已打断的，将状态设置为未打断的
         return currentThread().getAndClearInterrupt();
     }
 
@@ -1637,7 +1637,7 @@ public class Thread implements Runnable {
         return interrupted;
     }
 
-    final void setInterrupt() {
+    final void setInterrupt() {// 设置打断
         // assert Thread.currentCarrierThread() == this;
         if (!interrupted) {
             interrupted = true;
@@ -2614,7 +2614,7 @@ public class Thread implements Runnable {
 
     /* Some private helper methods */
     private native void setPriority0(int newPriority);
-    private native void interrupt0();
+    private native void interrupt0();// 唤醒等待的线程 进行unpark
     private static native void clearInterruptEvent();
     private native void setNativeName(String name);
 
